@@ -61,7 +61,7 @@ std::string to_string_bin(
 {
 	char p[33];
 	for (uint8_t c = 0; c < l; c++) {
-		if (n & (1 << (l - c)))
+		if (n & (1 << (l - 1 - c)))
 			p[c] = '1';
 		else
 			p[c] = '0';
@@ -112,10 +112,25 @@ std::string to_string_dec_int(
 	return q;
 }
 
-std::string to_string_short_freq(const uint64_t f, const int32_t l) {
-	auto final_str = to_string_dec_int(f / 1000000, 4) + ".";
-	final_str += to_string_dec_int((f / 100) % 10000, l, '0');
+std::string to_string_short_freq(const uint64_t f) {
+	auto final_str = to_string_dec_int(f / 1000000, 4) + "." + to_string_dec_int((f / 100) % 10000, 4, '0');
+	return final_str;
+}
 
+std::string to_string_time_ms(const uint32_t ms) {
+	std::string final_str { "" };
+	
+	if (ms < 1000) {
+		final_str = to_string_dec_uint(ms) + "ms";
+	} else {
+		auto seconds = ms / 1000;
+		
+		if (seconds >= 60)
+			final_str = to_string_dec_uint(seconds / 60) + "m";
+		
+		return final_str + to_string_dec_uint(seconds % 60) + "s";
+	}
+	
 	return final_str;
 }
 
@@ -146,25 +161,65 @@ std::string to_string_hex_array(uint8_t * const array, const int32_t l) {
 	return str_return;
 }
 
-std::string to_string_datetime(const rtc::RTC& value) {
-	return to_string_dec_uint(value.year(), 4, '0') + "/" +
-		to_string_dec_uint(value.month(), 2, '0') + "/" +
-		to_string_dec_uint(value.day(), 2, '0') + " " +
-		to_string_dec_uint(value.hour(), 2, '0') + ":" +
-		to_string_dec_uint(value.minute(), 2, '0') + ":" +
-		to_string_dec_uint(value.second(), 2, '0');
-}
-
-std::string to_string_time(const rtc::RTC& value) {
-	return to_string_dec_uint(value.hour(), 2, '0') + ":" +
-		to_string_dec_uint(value.minute(), 2, '0');
+std::string to_string_datetime(const rtc::RTC& value, const TimeFormat format) {
+	std::string string { "" };
+	
+	if (format == YMDHMS) {
+		string += to_string_dec_uint(value.year(), 4) + "/" +
+					to_string_dec_uint(value.month(), 2) + "/" +
+					to_string_dec_uint(value.day(), 2) + " ";
+	}
+	
+	string += to_string_dec_uint(value.hour(), 2) + ":" +
+	string += to_string_dec_uint(value.minute(), 2);
+	
+	if ((format == YMDHMS) || (format == HMS))
+		string += ":" + to_string_dec_uint(value.second(), 2);
+	
+	return string;
 }
 
 std::string to_string_timestamp(const rtc::RTC& value) {
-	return to_string_dec_uint(value.year(), 4, '0') +
-		to_string_dec_uint(value.month(), 2, '0') +
-		to_string_dec_uint(value.day(), 2, '0') +
-		to_string_dec_uint(value.hour(), 2, '0') +
-		to_string_dec_uint(value.minute(), 2, '0') +
-		to_string_dec_uint(value.second(), 2, '0');
+	return to_string_dec_uint(value.year(), 4) +
+		to_string_dec_uint(value.month(), 2) +
+		to_string_dec_uint(value.day(), 2) +
+		to_string_dec_uint(value.hour(), 2) +
+		to_string_dec_uint(value.minute(), 2) +
+		to_string_dec_uint(value.second(), 2);
+}
+
+std::string to_string_FAT_timestamp(const FATTimestamp& timestamp) {
+	return to_string_dec_uint((timestamp.FAT_date >> 9) + 1980) + "/" +
+		to_string_dec_uint((timestamp.FAT_date >> 5) & 0xF, 2) + "/" +
+		to_string_dec_uint((timestamp.FAT_date & 0x1F), 2) + " " +
+		to_string_dec_uint((timestamp.FAT_time >> 11), 2) + ":" +
+		to_string_dec_uint((timestamp.FAT_time >> 5) & 0x3F, 2);
+}
+
+std::string unit_auto_scale(double n, const uint32_t base_nano, uint32_t precision) {
+	const uint32_t powers_of_ten[5] = { 1, 10, 100, 1000, 10000 };
+	std::string string { "" };
+	uint32_t prefix_index = base_nano;
+	double integer_part;
+	double fractional_part;
+	
+	precision = std::min((uint32_t)4, precision);
+	
+	while (n > 1000) {
+		n /= 1000.0;
+		prefix_index++;
+	}
+	
+	fractional_part = modf(n, &integer_part) * powers_of_ten[precision];
+	if (fractional_part < 0)
+		fractional_part = -fractional_part;
+	
+	string = to_string_dec_int(integer_part);
+	if (precision)
+		string += '.' + to_string_dec_uint(fractional_part, precision);
+	
+	if (prefix_index != 3)
+		string += unit_prefix[prefix_index];
+	
+	return string;
 }

@@ -28,6 +28,7 @@
 #include "ui_painter.hpp"
 #include "ui_focus.hpp"
 #include "ui_font_fixed_8x16.hpp"
+#include "rtc_time.hpp"
 #include "radio.hpp"
 
 #include "portapack.hpp"
@@ -235,6 +236,25 @@ private:
 	std::vector<Label> labels_;
 };
 
+class LiveDateTime : public Widget {
+public:
+	LiveDateTime(Rect parent_rect);
+	~LiveDateTime();
+
+	void paint(Painter& painter) override;
+	
+	std::string& string() {
+		return text;
+	}
+
+private:
+	void on_tick_second();
+	
+	rtc::RTC datetime { };
+	SignalToken signal_token_tick_second { };
+	std::string text { };
+};
+
 class BigFrequency : public Widget {
 public:
 	BigFrequency(Rect parent_rect, rf::Frequency frequency);
@@ -245,6 +265,8 @@ public:
 
 private:
 	rf::Frequency _frequency;
+	
+	static constexpr Dim digit_width = 32;
 	
 	const uint8_t segment_font[11] = {
 		0b00111111,	// 0: ABCDEF
@@ -258,6 +280,16 @@ private:
 		0b01111111,	// 8: ABCDEFG
 		0b01101111,	// 9: ABCDFG
 		0b01000000	// -: G
+	};
+	
+	const Rect segments[7] = {
+		{{4, 0}, 	{20, 4}},
+		{{24, 4}, 	{4, 20}},
+		{{24, 28}, 	{4, 20}},
+		{{4, 48}, 	{20, 4}},
+		{{0, 28}, 	{4, 20}},
+		{{0, 4}, 	{4, 20}},
+		{{4, 24}, 	{20, 4}}
 	};
 };
 
@@ -289,7 +321,7 @@ public:
 	void on_hide() override;
 
 private:
-	bool visible = false;
+	//bool visible = false;
 	Point pos { 0, 0 };
 	std::string buffer { };
 
@@ -406,18 +438,22 @@ public:
 
 class ImageOptionsField : public Widget {
 public:
-	using image_t = const unsigned char *;
 	using value_t = int32_t;
-	using option_t = std::pair<image_t, value_t>;
+	using option_t = std::pair<const Bitmap*, value_t>;
 	using options_t = std::vector<option_t>;
 
 	std::function<void(size_t, value_t)> on_change { };
 	std::function<void(void)> on_show_options { };
 
-	ImageOptionsField(Rect parent_rect, options_t options);
+	ImageOptionsField(
+		const Rect parent_rect,
+		const Color foreground,
+		const Color background,
+		const options_t options
+	);
 	
 	ImageOptionsField(
-	) : ImageOptionsField { { }, { } }
+	) : ImageOptionsField { { }, Color::white(), Color::black(), { } }
 	{
 	}
 	
@@ -438,6 +474,8 @@ public:
 private:
 	options_t options;
 	size_t selected_index_ { 0 };
+	Color foreground_;
+	Color background_;
 };
 
 class OptionsField : public Widget {
@@ -479,9 +517,15 @@ public:
 
 	using range_t = std::pair<int32_t, int32_t>;
 
-	NumberField(Point parent_pos, int length, range_t range, int32_t step, char fill_char);
+	NumberField(Point parent_pos, int length, range_t range, int32_t step, char fill_char, bool can_loop);
+	
+	NumberField(Point parent_pos, int length, range_t range, int32_t step, char fill_char
+	) : NumberField { parent_pos, length, range, step, fill_char, false }
+	{
+	}
+	
 	NumberField(
-	) : NumberField { { 0, 0 }, 1, { 0, 1 }, 1, ' ' }
+	) : NumberField { { 0, 0 }, 1, { 0, 1 }, 1, ' ', false }
 	{
 	}
 
@@ -491,6 +535,7 @@ public:
 	int32_t value() const;
 	void set_value(int32_t new_value, bool trigger_change = true);
 	void set_range(const int32_t min, const int32_t max);
+	void set_step(const int32_t new_step);
 
 	void paint(Painter& painter) override;
 
@@ -500,10 +545,11 @@ public:
 
 private:
 	range_t range;
-	const int32_t step;
+	int32_t step;
 	const int length_;
 	const char fill_char;
 	int32_t value_ { 0 };
+	bool can_loop { };
 
 	int32_t clip_value(int32_t value);
 };
@@ -552,7 +598,7 @@ private:
 class Waveform : public Widget {
 public:
 
-	Waveform(Rect parent_rect, int8_t * data, uint32_t length, uint32_t offset, bool digital, Color color);
+	Waveform(Rect parent_rect, int16_t * data, uint32_t length, uint32_t offset, bool digital, Color color);
 
 	Waveform(const Waveform&) = delete;
 	Waveform(Waveform&&) = delete;
@@ -561,33 +607,61 @@ public:
 
 	void set_offset(const uint32_t new_offset);
 	void set_length(const uint32_t new_length);
+	void set_cursor(const uint32_t i, const int16_t position);
 
 	void paint(Painter& painter) override;
 
 private:
-	int8_t * data_;
+	const Color cursor_colors[2] = { Color::cyan(), Color::magenta() };
+	
+	int16_t * data_;
 	uint32_t length_;
 	uint32_t offset_;
 	bool digital_ { false };
 	Color color_;
+	int16_t cursors[2] { };
+	bool show_cursors { false };
 };
 
 class VuMeter : public Widget {
 public:
 
-	VuMeter(Rect parent_rect, uint32_t LEDs);
+	VuMeter(Rect parent_rect, uint32_t LEDs, bool show_max);
 
-	void set_value(const uint8_t new_value);
-	void set_mark(const uint8_t new_mark);
+	void set_value(const uint32_t new_value);
+	void set_mark(const uint32_t new_mark);
 
 	void paint(Painter& painter) override;
 
 private:
 	uint32_t LEDs_, LED_height { 0 };
-	uint32_t value_ { 0 }, prev_value { 0 };
+	uint32_t value_ { 0 }, prev_value { 255 };	// Forces painting on first display
 	uint32_t split { 0 };
 	uint16_t max { 0 }, prev_max { 0 }, hold_timer { 0 }, mark { 0 }, prev_mark { 0 };
-	int height;
+	bool show_max_;
+};
+
+class OptionTabView : public View {
+public:
+	OptionTabView(Rect parent_rect);
+	
+	void focus() override;
+	
+	bool is_enabled();
+	void set_type(std::string type);
+
+protected:
+	bool enabled { false };
+	
+	void set_enabled(bool value);
+	
+private:
+	Checkbox check_enable {
+		{ 2 * 8, 0 * 16 },
+		20,
+		"",
+		false
+	};
 };
 
 } /* namespace ui */

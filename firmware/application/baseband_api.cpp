@@ -23,6 +23,7 @@
 #include "baseband_api.hpp"
 
 #include "audio.hpp"
+#include "tonesets.hpp"
 #include "dsp_iir_config.hpp"
 
 #include "portapack_shared_memory.hpp"
@@ -52,7 +53,7 @@ void AMConfig::apply() const {
 	audio::set_rate(audio::Rate::Hz_12000);
 }
 
-void NBFMConfig::apply() const {
+void NBFMConfig::apply(const uint8_t squelch_level) const {
 	const NBFMConfigureMessage message {
 		decim_0,
 		decim_1,
@@ -60,7 +61,8 @@ void NBFMConfig::apply() const {
 		2,
 		deviation,
 		audio_24k_hpf_300hz_config,
-		audio_24k_deemph_300_6_config
+		audio_24k_deemph_300_6_config,
+		squelch_level
 	};
 	send_message(&message);
 	audio::set_rate(audio::Rate::Hz_24000);
@@ -115,9 +117,19 @@ void set_sstv_data(const uint8_t vis_code, const uint32_t pixel_duration) {
 	send_message(&message);
 }
 
+void set_afsk(const uint32_t baudrate, const uint32_t word_length, const uint32_t trigger_value, const bool trigger_word) {
+	const AFSKRxConfigureMessage message {
+		baudrate,
+		word_length,
+		trigger_value,
+		trigger_word
+	};
+	send_message(&message);
+}
+
 void set_afsk_data(const uint32_t afsk_samples_per_bit, const uint32_t afsk_phase_inc_mark, const uint32_t afsk_phase_inc_space,
 					const uint8_t afsk_repeat, const uint32_t afsk_bw, const uint8_t symbol_count) {
-	const AFSKConfigureMessage message {
+	const AFSKTxConfigureMessage message {
 		afsk_samples_per_bit,
 		afsk_phase_inc_mark,
 		afsk_phase_inc_space,
@@ -129,7 +141,7 @@ void set_afsk_data(const uint32_t afsk_samples_per_bit, const uint32_t afsk_phas
 }
 
 void kill_afsk() {
-	const AFSKConfigureMessage message {
+	const AFSKTxConfigureMessage message {
 		0,
 		0,
 		0,
@@ -141,13 +153,13 @@ void kill_afsk() {
 }
 
 void set_audiotx_data(const uint32_t divider, const uint32_t bw, const uint32_t gain_x10,
-					const bool ctcss_enabled, const uint32_t ctcss_phase_inc) {
+					const uint32_t tone_key_delta, const float tone_key_mix_weight) {
 	const AudioTXConfigMessage message {
 		divider,
 		bw,
 		gain_x10,
-		ctcss_phase_inc,
-		ctcss_enabled
+		tone_key_delta,
+		tone_key_mix_weight
 	};
 	send_message(&message);
 }
@@ -159,10 +171,9 @@ void set_fifo_data(const int8_t * data) {
 	send_message(&message);
 }
 
-void set_pwmrssi(int32_t avg, bool enabled) {
-	const PWMRSSIConfigureMessage message {
+void set_pitch_rssi(int32_t avg, bool enabled) {
+	const PitchRSSIConfigureMessage message {
 		enabled,
-		1000,	// 1kHz
 		avg
 	};
 	send_message(&message);	
@@ -223,6 +234,20 @@ void set_rds_data(const uint16_t message_length) {
 void set_spectrum(const size_t sampling_rate, const size_t trigger) {
 	const WidebandSpectrumConfigMessage message {
 		sampling_rate, trigger
+	};
+	send_message(&message);
+}
+
+void set_siggen_tone(const uint32_t tone) {
+	const SigGenToneMessage message {
+		TONES_F2D(tone)
+	};
+	send_message(&message);
+}
+
+void set_siggen_config(const uint32_t bw, const uint32_t shape, const uint32_t duration) {
+	const SigGenConfigMessage message {
+		bw, shape, duration * TONES_SAMPLERATE
 	};
 	send_message(&message);
 }

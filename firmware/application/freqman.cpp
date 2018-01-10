@@ -23,144 +23,162 @@
 #include "freqman.hpp"
 #include <algorithm>
 
-#define FREQMAN_MAX_PER_CAT 64
-#define FREQMAN_CAT_MAX_LEN 8
-#define FREQMAN_DESC_MAX_LEN 32
+std::vector<std::string> get_freqman_files() {
+	std::vector<std::string> file_list;
+	
+	auto files = scan_root_files(u"FREQMAN", u"*.TXT");
+	
+	for (auto file : files) {
+		file_list.emplace_back(file.stem().string());
+	}
+	
+	return file_list;
+};
 
-bool load_freqman_file(freqman_db &db) {
-	File freqs_file;
-	size_t length, span_end, n = 0;
-	uint64_t seek_pos = 0;
-	char * line_end;
-	int32_t category_id;
+bool load_freqman_file(std::string& file_stem, freqman_db &db) {
+	File freqman_file;
+	size_t length, n = 0, file_position = 0;
 	char * pos;
-	char desc_buffer[FREQMAN_DESC_MAX_LEN + 1] = { 0 };
-	char category_buffer[FREQMAN_CAT_MAX_LEN + 1] = { 0 };
+	char * line_start;
+	char * line_end;
 	std::string description;
-	rf::Frequency value;
-	std::vector<std::string>::iterator category_find;
+	rf::Frequency frequency_a, frequency_b;
+	char file_data[257];
+	freqman_entry_type type;
 	
-	char file_buffer[256];
+	db.clear();
 	
-	while (freqs_file.open("freqman.txt").is_valid()) {
-		auto result = freqs_file.create("freqman.txt");
-		if (result.is_valid())
-			return false;
-	}
+	auto result = freqman_file.open("FREQMAN/" + file_stem + ".TXT");
+	if (result.is_valid())
+		return false;
 	
-	freqs_file.read(file_buffer, 256);
-	
-	while ((pos = strstr(file_buffer, "f=")) && (n < FREQMAN_MAX_PER_CAT)) {
+	while (1) {
+		// Read a 256 bytes block from file
+		freqman_file.seek(file_position);
 		
-		// Cut buffer at end of line
-		line_end = file_buffer;
-		do {
-			span_end = strcspn(line_end, "\x0D\x0A");
-			line_end += (span_end + 1);
-		} while (span_end);
-		*line_end = (char)0;
+		memset(file_data, 0, 257);
+		auto read_size = freqman_file.read(file_data, 256);
+		if (read_size.is_error())
+			return false;	// Read error
 		
-		pos += 2;
-		value = strtol(pos, nullptr, 10);				// Read frequency
-
-		pos = strstr(file_buffer, "d=");
-		if (pos) {
-			pos += 2;
-			length = strcspn(pos, ",\x0D\x0A");			// Read description until , or CR LF
-			if (length > FREQMAN_DESC_MAX_LEN) length = FREQMAN_DESC_MAX_LEN;
-			memcpy(desc_buffer, pos, length);
-			desc_buffer[length] = (char)0;
-			description = desc_buffer;
-		} else {
-			description = "-";
-		}
+		file_position += 256;
 		
-		pos = strstr(file_buffer, "c=");
-		if (pos) {
-			pos += 2;
-			length = strcspn(pos, ",\x0D\x0A");			// Read category name until , or CR LF
-			if (length > FREQMAN_CAT_MAX_LEN) length = FREQMAN_CAT_MAX_LEN;
-			memcpy(category_buffer, pos, length);
-			category_buffer[length] = (char)0;
-			
-			// See if we already know that category
-			category_find = find(db.categories.begin(), db.categories.end(), category_buffer);
-			if (category_find == db.categories.end()) {
-				// Not found: add to list
-				db.categories.push_back(category_buffer);
-				category_id = db.categories.size() - 1;
-			} else {
-				// Found
-				category_id = category_find - db.categories.begin();
-			}
-		} else {
-			category_id = -1;							// Uncategorized
-		}
+		// Reset line_start to beginning of buffer
+		line_start = file_data;
 		
-		db.entries.push_back({ value, "", description, category_id });
-		n++;
-
-		seek_pos += (line_end - file_buffer);
-
-		if (freqs_file.seek(seek_pos).value() == seek_pos)
+		if (!strstr(file_data, "f=") && !strstr(file_data, "a="))
 			break;
-		else
-			freqs_file.read(file_buffer, 256);
+		
+		// Look for complete lines in buffer
+		while ((line_end = strstr(line_start, "\x0A"))) {
+			// Read frequency
+			pos = strstr(line_start, "f=");
+			frequency_b = 0;
+			type = SINGLE;
+			if (pos) {
+				pos += 2;
+				frequency_a = strtoll(pos, nullptr, 10);
+			} else {
+				// ...or range
+				pos = strstr(line_start, "a=");
+				if (pos) {
+					pos += 2;
+					frequency_a = strtoll(pos, nullptr, 10);
+					type = RANGE;
+					pos = strstr(line_start, "b=");
+					if (pos) {
+						pos += 2;
+						frequency_b = strtoll(pos, nullptr, 10);
+					} else
+						frequency_b = 0;
+				} else
+					frequency_a = 0;
+			}
+			
+			// Read description until , or LF
+			pos = strstr(line_start, "d=");
+			if (pos) {
+				pos += 2;
+				length = std::min(strcspn(pos, ",\x0A"), (size_t)FREQMAN_DESC_MAX_LEN);
+				description = string(pos, length);
+			} else
+				description = "-";
+			
+			db.push_back({ frequency_a, frequency_b, description, type });
+			n++;
+			
+			if (n >= FREQMAN_MAX_PER_FILE) return true;
+			
+			line_start = line_end + 1;
+			if (line_start - file_data >= 256) break;
+		}
+		
+		if (read_size.value() != 256)
+			break;	// End of file
+		
+		// Restart at beginning of last incomplete line
+		file_position -= (file_data + 256 - line_start);
 	}
-	
-	//chHeapFree(file_buffer);
 	
 	return true;
 }
 
-bool save_freqman_file(freqman_db &db) {
-	File freqs_file;
-	size_t n;
+bool save_freqman_file(std::string& file_stem, freqman_db &db) {
+	File freqman_file;
 	std::string item_string;
-	int32_t category_id;
+	rf::Frequency frequency_a, frequency_b;
 	
-	if (!create_freqman_file(freqs_file)) return false;
+	if (!create_freqman_file(file_stem, freqman_file))
+		return false;
 	
-	for (n = 0; n < db.entries.size(); n++) {
-		item_string = "f=" + to_string_dec_uint(db.entries[n].value);
+	for (size_t n = 0; n < db.size(); n++) {
+		auto& entry = db[n];
+
+		frequency_a = entry.frequency_a;
 		
-		if (db.entries[n].description.size())
-			item_string += ",d=" + db.entries[n].description;
+		if (entry.type == SINGLE) {
+			// Single
+			
+			// TODO: Make to_string_dec_uint be able to return uint64_t's
+			// Please forgive me...
+			item_string = "f=" + to_string_dec_uint(frequency_a / 1000) + to_string_dec_uint(frequency_a % 1000UL, 3, '0');
+			
+		} else {
+			// Range
+			frequency_b = entry.frequency_b;
+			
+			item_string = "a=" + to_string_dec_uint(frequency_a / 1000) + to_string_dec_uint(frequency_a % 1000UL, 3, '0');
+			item_string += ",b=" + to_string_dec_uint(frequency_b / 1000) + to_string_dec_uint(frequency_b % 1000UL, 3, '0');
+		}
 		
-		category_id = db.entries[n].category_id;
-		if ((category_id >= 0) && (category_id < (int32_t)db.categories.size()))
-			item_string += ",c=" + db.categories[db.entries[n].category_id];
+		if (entry.description.size())
+			item_string += ",d=" + entry.description;
 		
-		freqs_file.write_line(item_string);
+		freqman_file.write_line(item_string);
 	}
 	
 	return true;
 }
 
-bool create_freqman_file(File &freqs_file) {
-	auto result = freqs_file.create("freqman.txt");
+bool create_freqman_file(std::string& file_stem, File& freqman_file) {
+	auto result = freqman_file.create("FREQMAN/" + file_stem + ".TXT");
 	if (result.is_valid())
 		return false;
 	
 	return true;
 }
 
-std::string freqman_item_string(freqman_entry &entry) {
-	std::string item_string, frequency_str, description;
-	rf::Frequency value;
-	
-	value = entry.value;
-	entry.frequency_str = to_string_dec_int(value / 1000000, 4) + "." +
-							to_string_dec_int((value / 100) % 10000, 4, '0');
-	
-	item_string = entry.frequency_str + "M: ";
-	
-	if (entry.description.size() <= 19) {
-		item_string += entry.description;
+std::string freqman_item_string(freqman_entry &entry, size_t max_length) {
+	std::string item_string;
+
+	if (entry.type == SINGLE) {
+		item_string = to_string_short_freq(entry.frequency_a) + "M: " + entry.description;
 	} else {
-		// Cut if too long
-		item_string += entry.description.substr(0, 16) + "...";
+		item_string = "Range: " + entry.description;
 	}
+	
+	if (item_string.size() > max_length)
+		return item_string.substr(0, max_length - 3) + "...";
 	
 	return item_string;
 }

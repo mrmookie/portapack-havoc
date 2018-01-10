@@ -97,6 +97,10 @@ uint32_t WAVFileReader::ms_duration() {
 	return ((data_size_ * 1000) / sample_rate_) / bytes_per_sample;
 }
 
+void WAVFileReader::data_seek(const uint64_t Offset) {
+	file.seek(data_start + (Offset * bytes_per_sample));
+}
+	
 /*int WAVFileReader::seek_mss(const uint16_t minutes, const uint8_t seconds, const uint32_t samples) {
 	const auto result = file.seek(data_start + ((((minutes * 60) + seconds) * sample_rate_) + samples) * bytes_per_sample);
 
@@ -118,15 +122,21 @@ uint32_t WAVFileReader::data_size() {
 	return data_size_;
 }
 
+uint32_t WAVFileReader::sample_count() {
+	return data_size_ / bytes_per_sample;
+}
+
 uint16_t WAVFileReader::bits_per_sample() {
 	return header.fmt.wBitsPerSample;
 }
 
 Optional<File::Error> WAVFileWriter::create(
 	const std::filesystem::path& filename,
-	size_t sampling_rate_set
+	size_t sampling_rate_set,
+	const std::string& title_set
 ) {
 	sampling_rate = sampling_rate_set;
+	title = title_set;
 	const auto create_error = FileWriter::create(filename);
 	if( create_error.is_valid() ) {
 		return create_error;
@@ -136,19 +146,37 @@ Optional<File::Error> WAVFileWriter::create(
 }
 
 Optional<File::Error> WAVFileWriter::update_header() {
-	header_t header { sampling_rate, (uint32_t)bytes_written };
+	header_t header { sampling_rate, (uint32_t)bytes_written - sizeof(header_t), info_chunk_size };
+	
 	const auto seek_0_result = file.seek(0);
 	if( seek_0_result.is_error() ) {
 		return seek_0_result.error();
 	}
+	
 	const auto old_position = seek_0_result.value();
+	
 	const auto write_result = file.write(&header, sizeof(header));
 	if( write_result.is_error() ) {
 		return write_result.error();
 	}
+	
 	const auto seek_old_result = file.seek(old_position);
 	if( seek_old_result.is_error() ) {
 		return seek_old_result.error();
 	}
+	
+	return { };
+}
+
+Optional<File::Error> WAVFileWriter::write_tags() {
+	tags_t tags { title };
+	
+	const auto write_result = file.write(&tags, sizeof(tags));
+	if( write_result.is_error() ) {
+		return write_result.error();
+	}
+	
+	info_chunk_size = sizeof(tags);
+	
 	return { };
 }

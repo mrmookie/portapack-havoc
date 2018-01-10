@@ -35,6 +35,8 @@
 #include "ert_packet.hpp"
 #include "tpms_packet.hpp"
 #include "pocsag_packet.hpp"
+#include "sonde_packet.hpp"
+#include "adsb_frame.hpp"
 #include "jammer.hpp"
 #include "dsp_fir_taps.hpp"
 #include "dsp_iir.hpp"
@@ -59,24 +61,27 @@ public:
 		Shutdown = 8,
 		AISPacket = 7,
 		ERTPacket = 9,
-		UpdateSpectrum = 10,
-		NBFMConfigure = 11,
-		WFMConfigure = 12,
-		AMConfigure = 13,
-		ChannelSpectrumConfig = 14,
-		SpectrumStreamingConfig = 15,
-		DisplaySleep = 16,
-		CaptureConfig = 17,
-		CaptureThreadDone = 18,
-		ReplayConfig = 19,
-		ReplayThreadDone = 20,
+		SondePacket = 10,
+		UpdateSpectrum = 11,
+		NBFMConfigure = 12,
+		WFMConfigure = 13,
+		AMConfigure = 14,
+		ChannelSpectrumConfig = 15,
+		SpectrumStreamingConfig = 16,
+		DisplaySleep = 17,
+		CaptureConfig = 18,
+		CaptureThreadDone = 19,
+		ReplayConfig = 20,
+		ReplayThreadDone = 21,
+		AFSKRxConfigure = 22,
+		StatusRefresh = 23,
 
-		TXDone = 30,
+		TXProgress = 30,
 		Retune = 31,
 		
 		TonesConfigure = 32,
-		AFSKConfigure = 33,
-		PWMRSSIConfigure = 34,
+		AFSKTxConfigure = 33,
+		PitchRSSIConfigure = 34,
 		OOKConfigure = 35,
 		RDSConfigure = 36,
 		AudioTXConfig = 37,
@@ -87,13 +92,19 @@ public:
 		WidebandSpectrumConfig = 42,
 		FSKConfigure = 43,
 		SSTVConfigure = 44,
+		SigGenConfig = 43,
+		SigGenTone = 44,
 		
 		POCSAGPacket = 50,
+		ADSBFrame = 51,
+		AFSKData = 52,
+		TestAppPacket = 53,
 		
-		RequestSignal = 52,
-		FIFOData = 53,
+		RequestSignal = 60,
+		FIFOData = 61,
 		
-		AudioLevel = 54,
+		AudioLevelReport = 70,
+		CodedSquelch = 71,
 		MAX
 	};
 
@@ -209,6 +220,14 @@ public:
 	}
 };
 
+class StatusRefreshMessage : public Message {
+public:
+	constexpr StatusRefreshMessage(
+	) : Message { ID::StatusRefresh }
+	{
+	}
+};
+
 class AudioStatisticsMessage : public Message {
 public:
 	constexpr AudioStatisticsMessage(
@@ -315,6 +334,45 @@ public:
 	pocsag::POCSAGPacket packet;
 };
 
+class ADSBFrameMessage : public Message {
+public:
+	constexpr ADSBFrameMessage(
+		const adsb::ADSBFrame& frame
+	) : Message { ID::ADSBFrame },
+		frame { frame }
+	{
+	}
+	
+	adsb::ADSBFrame frame;
+};
+
+class AFSKDataMessage : public Message {
+public:
+	constexpr AFSKDataMessage(
+		const bool is_data,
+		const uint32_t value
+	) : Message { ID::AFSKData },
+		is_data { is_data },
+		value { value }
+	{
+	}
+	
+	bool is_data;
+	uint32_t value;
+};
+
+class CodedSquelchMessage : public Message {
+public:
+	constexpr CodedSquelchMessage(
+		const uint32_t value
+	) : Message { ID::CodedSquelch },
+		value { value }
+	{
+	}
+	
+	uint32_t value;
+};
+
 class ShutdownMessage : public Message {
 public:
 	constexpr ShutdownMessage(
@@ -339,6 +397,34 @@ public:
 	baseband::Packet packet;
 };
 
+class SondePacketMessage : public Message {
+public:
+	constexpr SondePacketMessage(
+		const sonde::Packet::Type type,
+		const baseband::Packet& packet
+	) : Message { ID::SondePacket },
+		type { type },
+		packet { packet }
+	{
+	}
+
+	sonde::Packet::Type type;
+
+	baseband::Packet packet;
+};
+
+class TestAppPacketMessage : public Message {
+public:
+	constexpr TestAppPacketMessage(
+		const baseband::Packet& packet
+	) : Message { ID::TestAppPacket },
+		packet { packet }
+	{
+	}
+
+	baseband::Packet packet;
+};
+
 class UpdateSpectrumMessage : public Message {
 public:
 	constexpr UpdateSpectrumMessage(
@@ -356,7 +442,8 @@ public:
 		const size_t channel_decimation,
 		const size_t deviation,
 		const iir_biquad_config_t audio_hpf_config,
-		const iir_biquad_config_t audio_deemph_config
+		const iir_biquad_config_t audio_deemph_config,
+		const uint8_t squelch_level
 	) : Message { ID::NBFMConfigure },
 		decim_0_filter(decim_0_filter),
 		decim_1_filter(decim_1_filter),
@@ -364,7 +451,8 @@ public:
 		channel_decimation { channel_decimation },
 		deviation { deviation },
 		audio_hpf_config(audio_hpf_config),
-		audio_deemph_config(audio_deemph_config)
+		audio_deemph_config(audio_deemph_config),
+		squelch_level(squelch_level)
 	{
 	}
 
@@ -375,6 +463,7 @@ public:
 	const size_t deviation;
 	const iir_biquad_config_t audio_hpf_config;
 	const iir_biquad_config_t audio_deemph_config;
+	const uint8_t squelch_level;
 };
 
 class WFMConfigureMessage : public Message {
@@ -461,7 +550,7 @@ public:
 	
 	size_t read(void* p, const size_t count) {
 		const auto copy_size = std::min(used_, count);
-		memcpy(p, &data_[used_ - copy_size], copy_size);
+		memcpy(p, &data_[capacity_ - used_], copy_size);
 		used_ -= copy_size;
 		return copy_size;
 	}
@@ -480,6 +569,10 @@ public:
 
 	size_t size() const {
 		return used_;
+	}
+	
+	size_t capacity() const {
+		return capacity_;
 	}
 
 	void set_size(const size_t value) {
@@ -564,10 +657,10 @@ public:
 	ReplayConfig* const config;
 };
 
-class TXDoneMessage : public Message {
+class TXProgressMessage : public Message {
 public:
-	constexpr TXDoneMessage(
-	) : Message { ID::TXDone }
+	constexpr TXProgressMessage(
+	) : Message { ID::TXProgress }
 	{
 	}
 	
@@ -575,24 +668,40 @@ public:
 	bool done = false;
 };
 
-
-
-class PWMRSSIConfigureMessage : public Message {
+class AFSKRxConfigureMessage : public Message {
 public:
-	constexpr PWMRSSIConfigureMessage(
+	constexpr AFSKRxConfigureMessage(
+		const uint32_t baudrate,
+		const uint32_t word_length,
+		const uint32_t trigger_value,
+		const bool trigger_word
+	) : Message { ID::AFSKRxConfigure },
+		baudrate(baudrate),
+		word_length(word_length),
+		trigger_value(trigger_value),
+		trigger_word(trigger_word)
+	{
+	}
+	
+	const uint32_t baudrate;
+	const uint32_t word_length;
+	const uint32_t trigger_value;
+	const bool trigger_word;
+};
+
+class PitchRSSIConfigureMessage : public Message {
+public:
+	constexpr PitchRSSIConfigureMessage(
 		const bool enabled,
-		const uint32_t synth_div,
-		const int32_t avg
-	) : Message { ID::PWMRSSIConfigure },
+		const int32_t rssi
+	) : Message { ID::PitchRSSIConfigure },
 		enabled(enabled),
-		synth_div(synth_div),
-		avg(avg)
+		rssi(rssi)
 	{
 	}
 	
 	const bool enabled;
-	const uint32_t synth_div;
-	const int32_t avg;
+	const int32_t rssi;
 };
 
 class TonesConfigureMessage : public Message {
@@ -642,10 +751,10 @@ public:
 	uint32_t range = 0;
 };
 
-class AudioLevelMessage : public Message {
+class AudioLevelReportMessage : public Message {
 public:
-	constexpr AudioLevelMessage(
-	) : Message { ID::AudioLevel }
+	constexpr AudioLevelReportMessage(
+	) : Message { ID::AudioLevelReport }
 	{
 	}
 	
@@ -658,34 +767,64 @@ public:
 		const uint32_t divider,
 		const uint32_t fm_delta,
 		const uint32_t gain_x10,
-		const uint32_t ctcss_phase_inc,
-		const bool ctcss_enabled
+		const uint32_t tone_key_delta,
+		const float tone_key_mix_weight
 	) : Message { ID::AudioTXConfig },
 		divider(divider),
 		fm_delta(fm_delta),
 		gain_x10(gain_x10),
-		ctcss_phase_inc(ctcss_phase_inc),
-		ctcss_enabled(ctcss_enabled)
+		tone_key_delta(tone_key_delta),
+		tone_key_mix_weight(tone_key_mix_weight)
 	{
 	}
 
 	const uint32_t divider;
 	const uint32_t fm_delta;
 	const uint32_t gain_x10;
-	const uint32_t ctcss_phase_inc;
-	const bool ctcss_enabled;
+	const uint32_t tone_key_delta;
+	const float tone_key_mix_weight;
 };
 
-class AFSKConfigureMessage : public Message {
+class SigGenConfigMessage : public Message {
 public:
-	constexpr AFSKConfigureMessage(
+	constexpr SigGenConfigMessage(
+		const uint32_t bw,
+		const uint32_t shape,
+		const uint32_t duration
+	) : Message { ID::SigGenConfig },
+		bw(bw),
+		shape(shape),
+		duration(duration)
+	{
+	}
+
+	const uint32_t bw;
+	const uint32_t shape;
+	const uint32_t duration;
+};
+
+class SigGenToneMessage : public Message {
+public:
+	constexpr SigGenToneMessage(
+		const uint32_t tone_delta
+	) : Message { ID::SigGenTone },
+		tone_delta(tone_delta)
+	{
+	}
+
+	const uint32_t tone_delta;
+};
+
+class AFSKTxConfigureMessage : public Message {
+public:
+	constexpr AFSKTxConfigureMessage(
 		const uint32_t samples_per_bit,
 		const uint32_t phase_inc_mark,
 		const uint32_t phase_inc_space,
 		const uint8_t repeat,
 		const uint32_t fm_delta,
 		const uint8_t symbol_count
-	) : Message { ID::AFSKConfigure },
+	) : Message { ID::AFSKTxConfigure },
 		samples_per_bit(samples_per_bit),
 		phase_inc_mark(phase_inc_mark),
 		phase_inc_space(phase_inc_space),
@@ -821,11 +960,13 @@ public:
 };
 
 // TODO: use streaming buffer instead
+// TODO: rename (not only used for requests)
 class RequestSignalMessage : public Message {
 public:
 	enum class Signal : char {
 		FillRequest = 1,
 		BeepRequest = 2,
+		Squelched = 3
 	};
 
 	constexpr RequestSignalMessage(
@@ -865,13 +1006,13 @@ public:
 class ReplayThreadDoneMessage : public Message {
 public:
 	constexpr ReplayThreadDoneMessage(
-		uint32_t error = 0
+		uint32_t return_code = 0
 	) : Message { ID::ReplayThreadDone },
-		error { error }
+		return_code { return_code }
 	{
 	}
 
-	uint32_t error;
+	uint32_t return_code;
 };
 
 #endif/*__MESSAGE_H__*/

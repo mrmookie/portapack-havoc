@@ -26,6 +26,8 @@
 #include "baseband_processor.hpp"
 #include "baseband_thread.hpp"
 
+#include "spectrum_collector.hpp"
+
 #include "stream_output.hpp"
 
 #include <array>
@@ -40,26 +42,34 @@ public:
 	void on_message(const Message* const message) override;
 
 private:
-	// TODO: Repeated value needs to be transmitted from application side.
-	static constexpr size_t baseband_fs = 500000;
-	//static constexpr auto spectrum_rate_hz = 50.0f;
+	static constexpr size_t baseband_fs = 4000000;
+	static constexpr auto spectrum_rate_hz = 50.0f;
 
 	BasebandThread baseband_thread { baseband_fs, this, NORMALPRIO + 20, baseband::Direction::Transmit };
-	//RSSIThread rssi_thread { NORMALPRIO + 10 };
 
-	std::array<complex16_t, 512> iq { };	// 2048 doesn't fit in allocated RAM
+	std::array<complex16_t, 256> iq { };
 	const buffer_c16_t iq_buffer {
 		iq.data(),
-		iq.size()
+		iq.size(),
+		baseband_fs / 8
 	};
+	
+	uint32_t channel_filter_pass_f = 0;
+	uint32_t channel_filter_stop_f = 0;
 
 	std::unique_ptr<StreamOutput> stream { };
 
-	/*SpectrumCollector channel_spectrum;
+	SpectrumCollector channel_spectrum { };
 	size_t spectrum_interval_samples = 0;
-	size_t spectrum_samples = 0;*/
+	size_t spectrum_samples = 0;
+	
+	bool configured { false };
+	uint32_t bytes_read { 0 };
 
 	void replay_config(const ReplayConfigMessage& message);
+	
+	TXProgressMessage txprogress_message { };
+	RequestSignalMessage sig_message { RequestSignalMessage::Signal::FillRequest };
 };
 
 #endif/*__PROC_REPLAY_HPP__*/

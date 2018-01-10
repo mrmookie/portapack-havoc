@@ -10,34 +10,41 @@ It is build on top of [ShareBrained's firmware](https://github.com/sharebrained/
 
 [READ THE WIKI](https://github.com/furrtek/portapack-havoc/wiki/Home/)
 
-Do you want to submit a bug report, suggest something, ... ? Don't hesitate, go here: https://github.com/furrtek/portapack-havoc/issues (Check the progress list below first).
+If you want to submit a bug report, suggest something... Don't hesitate, use this page: https://github.com/furrtek/portapack-havoc/issues (Check the progress list below first).
 
 # Summary
 
-As its name implies, HAVOC's functionalities can be fun, mean and even useful sometimes. You shouldn't use them. No. Bad. Put it down.
+As its name implies, HAVOC's functionalities can be fun, mean and even useful sometimes. You shouldn't use them. No ! Bad ! Put it down.
 
 **In most countries, radio transmissions are tightly regulated. Transmitting outside of free/public bands without a licence or authorization, even at very low power, is certainly forbidden where you live. Always bear that in mind. You're the ONLY ONE responsible for what you do with this software.**
 
 # Fork features
 
-* Microphone transmit with CTCSS
-* Frequency manager (save & load from SD card)
+* IQ file replay
+* Microphone FM transmit with CTCSS
+* CTCSS decoder
+* Frequency manager (save & load from SD card, with categories and notes)
+* File manager
 * "Soundboard" wave file player (put 8-bit mono files in SD card /wav directory)
-* POCSAG 512/1200/2400 transmitter
-* POCSAG 512/1200/2400 receiver/decoder
+* ADS-B receiver with map view
+* ADS-B transmitter (aircraft spoof)
+* SSTV transmitter
+* Fully configurable jammer
+* POCSAG transmitter
+* POCSAG receiver/decoder
 * Morse transmitter (FM tone and CW)
 * OOK transmitter for common remote encoders (PT2262, doorbells, remote outlets, some garage doors, ...)
 * RDS (Radio Data System) PSN, RadioText and Time groups transmitter
-* Fully configurable jammer
-* Scheduled numbers station (for spies on a budget, alerts, LARP scenarios, ...)
-* Nuoptix DTMF sync transmitter (quite specific but can be useful in some theme parks :) )
+* Meteorological radiosonde receiver for M10 and M2K2...
+* AFSK receiver
 * AFSK transmitter (Bell202...)
-* Virtual keyboard or Unistroke "handwriting" text input
+* Nuoptix DTMF sync transmitter (quite specific but can be useful in some theme parks :) )
+* TouchTunes jukebox universal remote (by Notpike)
 * LCR (Language de Commande Routier) message generator
-* Xylos transmitter, street lighting control (CCIR tones)
+* Street lighting control transmitter (CCIR tones)
 * "Play Dead" in case of emergency
-* Utilities such as tone generator and CW transmitter
-* PWM audio RSSI output (for crude direction finding)
+* Fully configurable RF signal generator
+* RSSI audio output as pitch (for direction finding)
 
 # Progress
 
@@ -46,20 +53,20 @@ Feature | Progress | Notes
 POCSAG RX   | 95% | Needs support for numeric messages
 Morse TX    | 95% | Needs fox hunt scheduler and live keying mode
 Mic. TX     | 95% | Carrier leak bug, need to find guard tones for various brands of wireless mics
+ADS-B RX    | 90% | Needs angle and speed decoding
 Close-Call™ | 85% | Needs adjustments and optimization for wider frequency range
+ADS-B TX    | 85% | Works but baseband module needs cleaning
 SSTV TX     | 80% | Needs better bitmap file handling, support for other modes (ROBOT ?) and callsign FSK ID
-IQ replay   | 50% | High priority
+Radiosondes | 75% | Needs support for other models
+Wave visualizer | 70% | Needs cleaning and handling of other sample formats, high priority
+AFSK RX     | 70% | Needs work regarding flexibility
 Sigfox RX   | 40% | Tuning basics done, needs decoding code and testing
-ADS-B TX    | 40% | UI and frame gen stuff done, needs baseband module
-Wave visualizer | 30% | Only the widget is ready, high priority
-Generic TXs | 20%  | Raw AX.25, AFSK, FSK, CCIR, DTMF... Tonesets are ready
-SI4032 TRX  | 0%  | And other sub-GHz transceiver chips
-SSTV RX     | 0%  |
-ADS-B RX    | 0%  | Could be fun. Is sensitivity high enough ?
+Generic TXs | 30% | Raw AX.25, AFSK, FSK, CCIR, DTMF... Tonesets are ready
+CC1101 TRX  | 10% | And other sub-GHz transceiver chips like SI4032...
+SSTV RX     | 0%  | 
 Scanner     | 0%  | Easy, could be used with POCSAG RX to catch jumping channels
 SSB TX      | 0%  | Requested but math is hard :(
 OOK RX      | 0%  | See if rtl_433's author is fine with using protocol defs
-AFSK RX     | 0%  | Shouldn't be too hard, bit-time shift and mix method ?
 Analog TV TX| 0%  | Enough CPU ? B&W and no sound ?
 LoJack RX   | 0%  | Basically AFSK RX
 DMR info RX | 0%  | Retrieve DMR channel info. **No voice** because of vocoder complexity and possible legal issue
@@ -67,12 +74,12 @@ Tetra info? | 0%  | Same
 
 # Screenshots
 
-![HAVOC screenshots](screenshots.png)
+![HAVOC screenshots](doc/screenshots.png)
 
 # Thanks
 
 * Sig and cLx for research on AFSK LCR, Xylos, and for lending remote-controlled outlets
-* Rainer Matla and DC1RDB for the donations :)
+* Pyr3x, Rainer Matla and DC1RDB for the donations :)
 * Keld Norman and Giorgio Campiotti for ideas and suggestions
 
 # License

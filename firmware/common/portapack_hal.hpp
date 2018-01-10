@@ -37,8 +37,8 @@ constexpr GPIO gpio_io_stbx		= gpio[GPIO5_0];	/* P2_0 */
 constexpr GPIO gpio_addr		= gpio[GPIO5_1];	/* P2_1 */
 constexpr GPIO gpio_lcd_te		= gpio[GPIO5_3];	/* P2_3 */
 constexpr GPIO gpio_unused		= gpio[GPIO5_7];	/* P2_8 */
-constexpr GPIO gpio_lcd_rd		= gpio[GPIO5_4];	/* P2_4 */
-constexpr GPIO gpio_lcd_wr		= gpio[GPIO1_10];	/* P2_9 */
+constexpr GPIO gpio_lcd_rdx		= gpio[GPIO5_4];	/* P2_4 */
+constexpr GPIO gpio_lcd_wrx		= gpio[GPIO1_10];	/* P2_9 */
 constexpr GPIO gpio_dir			= gpio[GPIO1_13];	/* P2_13 */
 constexpr std::array<GPIO, 8> gpios_data {
 	gpio[GPIO3_8],
@@ -55,6 +55,12 @@ constexpr GPIO gpio_cpld_tms = gpio[GPIO1_1];	// P1_8
 constexpr GPIO gpio_cpld_tdo = gpio[GPIO1_8];	// P1_5
 constexpr GPIO gpio_cpld_tck = gpio[GPIO3_0];	// P6_1
 constexpr GPIO gpio_cpld_tdi = gpio[GPIO3_1];	// P6_2
+
+constexpr auto pin_i2s0_mclk   = pins[CLK2];
+constexpr auto pin_i2s0_sck    = pins[P3_0];
+constexpr auto pin_i2s0_ws     = pins[P3_1];
+constexpr auto pin_i2s0_tx_sda = pins[P3_2];
+constexpr auto pin_i2s0_rx_sda = pins[P6_2];
 
 } /* namespace portapack */
 

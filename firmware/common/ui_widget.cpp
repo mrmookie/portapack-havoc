@@ -114,7 +114,9 @@ void Widget::hidden(bool hide) {
 		if( hide ) {
 			// TODO: Instead of dirtying parent entirely, dirty only children
 			// that overlap with this widget.
-			parent()->dirty_overlapping_children_in_rect(parent_rect());
+			
+			//parent()->dirty_overlapping_children_in_rect(parent_rect());
+			
 			/* TODO: Notify self and all non-hidden children that they're
 			 * now effectively hidden?
 			 */
@@ -274,6 +276,35 @@ std::string View::title() const {
 	return "";
 };
 
+/* OptionTabView *********************************************************/
+
+OptionTabView::OptionTabView(Rect parent_rect) {
+	set_parent_rect(parent_rect);
+	
+	add_child(&check_enable);
+	hidden(true);
+	
+	check_enable.on_select = [this](Checkbox&, bool value) {
+		enabled = value;
+	};
+}
+
+void OptionTabView::set_enabled(bool value) {
+	check_enable.set_value(value);
+}
+
+bool OptionTabView::is_enabled() {
+	return check_enable.value();
+}
+
+void OptionTabView::set_type(std::string type) {
+	check_enable.set_text("Transmit " + type);
+}
+
+void OptionTabView::focus() {
+	check_enable.focus();
+}
+
 /* Rectangle *************************************************************/
 
 Rectangle::Rectangle(
@@ -374,6 +405,45 @@ void Labels::paint(Painter& painter) {
 	}
 }
 
+/* LiveDateTime **********************************************************/
+
+void LiveDateTime::on_tick_second() {
+	rtcGetTime(&RTCD1, &datetime);
+	
+	text = to_string_dec_uint(datetime.month(), 2, '0') + "/" + to_string_dec_uint(datetime.day(), 2, '0') + " " +
+			to_string_dec_uint(datetime.hour(), 2, '0') + ":" + to_string_dec_uint(datetime.minute(), 2, '0');
+	
+	set_dirty();
+}
+
+LiveDateTime::LiveDateTime(
+	Rect parent_rect
+) : Widget { parent_rect }
+{
+	signal_token_tick_second = rtc_time::signal_tick_second += [this]() {
+		this->on_tick_second();
+	};
+}
+
+LiveDateTime::~LiveDateTime() {
+	rtc_time::signal_tick_second -= signal_token_tick_second;
+}
+
+void LiveDateTime::paint(Painter& painter) {
+	const auto rect = screen_rect();
+	const auto s = style();
+	
+	on_tick_second();
+
+	painter.fill_rectangle(rect, s.background);
+
+	painter.draw_string(
+		rect.location(),
+		s,
+		text
+	);
+}
+
 /* BigFrequency **********************************************************/
 
 BigFrequency::BigFrequency(
@@ -391,21 +461,22 @@ void BigFrequency::set(const rf::Frequency frequency) {
 
 void BigFrequency::paint(Painter& painter) {
 	uint32_t i, digit_def;
-	char digits[7];
+	std::array<char, 7> digits;
 	char digit;
-	Coord digit_x, digit_y;
+	Point digit_pos;
 	ui::Color segment_color;
 	
 	const auto rect = screen_rect();
 	
 	// Erase
-	painter.fill_rectangle({{0, rect.location().y()}, {240, 52}}, ui::Color::black());
+	painter.fill_rectangle({ { 0, rect.location().y() }, { 240, 52 } }, ui::Color::black());
 	
+	// Prepare digits
 	if (!_frequency) {
-		for (i = 0; i < 7; i++)		// ----.------
-			digits[i] = 10;
+		digits.fill(10);			// ----.---
+		digit_pos = { 0, rect.location().y() };
 	} else {
-		_frequency /= 1000;			// GMMM.KKKuuu
+		_frequency /= 1000;			// GMMM.KKK(uuu)
 		
 		for (i = 0; i < 7; i++) {
 			digits[6 - i] = _frequency % 10;
@@ -413,37 +484,38 @@ void BigFrequency::paint(Painter& painter) {
 		}
 		
 		// Remove leading zeros
-		for (i = 0; i < 7; i++) {
+		for (i = 0; i < 3; i++) {
 			if (!digits[i])
 				digits[i] = 16;		// "Don't draw" code
 			else
 				break;
 		}
+		
+		digit_pos = { (Coord)(240 - ((7 * digit_width) + 8) - (i * digit_width)) / 2, rect.location().y() };
 	}
 	
 	segment_color = style().foreground;
 
 	// Draw
-	digit_x = rect.location().x();		// 7 * 32 + 8 = 232 (4 px margins)
 	for (i = 0; i < 7; i++) {
 		digit = digits[i];
-		digit_y = rect.location().y();
+		
 		if (digit < 16) {
 			digit_def = segment_font[(uint8_t)digit];
-			if (digit_def & 0x01) painter.fill_rectangle({{digit_x + 4, 	digit_y}, 		{20, 4}}, 	segment_color);
-			if (digit_def & 0x02) painter.fill_rectangle({{digit_x + 24, 	digit_y + 4}, 	{4, 20}}, 	segment_color);
-			if (digit_def & 0x04) painter.fill_rectangle({{digit_x + 24, 	digit_y + 28}, 	{4, 20}}, 	segment_color);
-			if (digit_def & 0x08) painter.fill_rectangle({{digit_x + 4, 	digit_y + 48}, 	{20, 4}}, 	segment_color);
-			if (digit_def & 0x10) painter.fill_rectangle({{digit_x, 		digit_y + 28}, 	{4, 20}}, 	segment_color);
-			if (digit_def & 0x20) painter.fill_rectangle({{digit_x, 		digit_y + 4}, 	{4, 20}}, 	segment_color);
-			if (digit_def & 0x40) painter.fill_rectangle({{digit_x + 4, 	digit_y + 24}, 	{20, 4}}, 	segment_color);
+			
+			for (size_t s = 0; s < 7; s++) {
+				if (digit_def & 1)
+					painter.fill_rectangle({ digit_pos + segments[s].location(), segments[s].size() }, segment_color);
+				digit_def >>= 1;
+			}
 		}
+		
 		if (i == 3) {
 			// Dot
-			painter.fill_rectangle({{digit_x + 34, digit_y + 48}, {4, 4}}, segment_color);
-			digit_x += 40;
+			painter.fill_rectangle({ digit_pos + Point(34, 48), { 4, 4 } }, segment_color);
+			digit_pos += { (digit_width + 8), 0 };
 		} else {
-			digit_x += 32;
+			digit_pos += { digit_width, 0 };
 		}
 	}
 }
@@ -457,12 +529,18 @@ ProgressBar::ProgressBar(
 }
 
 void ProgressBar::set_max(const uint32_t max) {
-	_value = 0;
+	if (max == _max) return;
+	
+	if (_value > _max)
+		_value = _max;
+	
 	_max = max;
 	set_dirty();
 }
 
 void ProgressBar::set_value(const uint32_t value) {
+	if (value == _value) return;
+	
 	if (value > _max)
 		_value = _max;
 	else
@@ -503,7 +581,7 @@ void Console::clear() {
 void Console::write(std::string message) {
 	bool escape = false;
 	
-	if (visible) {
+	if (!hidden() && visible()) {
 		const Style& s = style();
 		const Font& font = s.font;
 		const auto rect = screen_rect();
@@ -511,12 +589,10 @@ void Console::write(std::string message) {
 		
 		for (const auto c : message) {
 			if (escape) {
-				if (c == '\x01')
-					pen_color = ui::Color::red();
-				else if (c == '\x02')
-					pen_color = ui::Color::green();
-				else if (c == '\x03')
-					pen_color = ui::Color::blue();
+				if (c <= 15)
+					pen_color = term_colors[c & 15];
+				else
+					pen_color = s.foreground;
 				escape = false;
 			} else {
 				if (c == '\n') {
@@ -540,7 +616,7 @@ void Console::write(std::string message) {
 		}
 		buffer = message;
 	} else {
-		buffer += message;
+		if (buffer.size() < 256) buffer += message;
 	}
 }
 
@@ -558,7 +634,7 @@ void Console::on_show() {
 	display.scroll_set_area(screen_r.top(), screen_r.bottom());
 	display.scroll_set_position(0);
 	clear();
-	visible = true;
+	//visible = true;
 }
 
 void Console::on_hide() {
@@ -566,9 +642,12 @@ void Console::on_hide() {
 	 * position?
 	 */
 	display.scroll_disable();
+	//visible = false;
 }
 
 void Console::crlf() {
+	if (hidden() || !visible()) return;
+	
 	const Style& s = style();
 	const auto sr = screen_rect();
 	const auto line_height = s.font.line_height();
@@ -944,10 +1023,14 @@ bool ImageButton::on_touch(const TouchEvent event) {
 /* ImageOptionsField *****************************************************/
 
 ImageOptionsField::ImageOptionsField(
-	Rect parent_rect,
-	options_t options
+	const Rect parent_rect,
+	const Color foreground,
+	const Color background,
+	const options_t options
 ) : Widget { parent_rect },
-	options { options }
+	options { options },
+	foreground_ { foreground },
+	background_ { background }
 {
 	set_focusable(true);
 }
@@ -990,14 +1073,20 @@ void ImageOptionsField::set_options(options_t new_options) {
 }
 
 void ImageOptionsField::paint(Painter& painter) {
-	const auto paint_style = has_focus() ? style().invert() : style();
-
-	if( selected_index() < options.size() ) {
-		const auto bmp_ptr = options[selected_index()].first;
-		painter.fill_rectangle({screen_rect().location(), {screen_rect().size().width() + 4, screen_rect().size().height() + 4}}, ui::Color::black());
-		painter.draw_rectangle({screen_rect().location(), {screen_rect().size().width() + 4, screen_rect().size().height() + 4}}, paint_style.background);
-		portapack::display.drawBMP({screen_pos().x() + 2, screen_pos().y() + 1}, bmp_ptr, true);
-	}
+	const bool selected = (has_focus() || highlighted());
+	const auto paint_style = selected ? style().invert() : style();
+	
+	painter.draw_rectangle(
+		{ screen_rect().location(), { screen_rect().size().width() + 4, screen_rect().size().height() + 4 } },
+		paint_style.background
+	);
+	
+	painter.draw_bitmap(
+		{screen_pos().x() + 2, screen_pos().y() + 2},
+		*options[selected_index_].first,
+		foreground_,
+		background_
+	);
 }
 
 void ImageOptionsField::on_focus() {
@@ -1108,12 +1197,14 @@ NumberField::NumberField(
 	int length,
 	range_t range,
 	int32_t step,
-	char fill_char
+	char fill_char,
+	bool can_loop
 ) : Widget { { parent_pos, { 8 * length, 16 } } },
 	range { range },
 	step { step },
 	length_ { length },
-	fill_char { fill_char }
+	fill_char { fill_char },
+	can_loop { can_loop }
 {
 	set_focusable(true);
 }
@@ -1123,6 +1214,13 @@ int32_t NumberField::value() const {
 }
 
 void NumberField::set_value(int32_t new_value, bool trigger_change) {
+	if (can_loop) {
+		if (new_value >= 0)
+			new_value = new_value % (range.second + 1);
+		else
+			new_value = range.second + new_value + 1;
+	}
+	
 	new_value = clip_value(new_value);
 
 	if( new_value != value() ) {
@@ -1138,6 +1236,10 @@ void NumberField::set_range(const int32_t min, const int32_t max) {
 	range.first = min;
 	range.second = max;
 	set_value(value(), false);
+}
+
+void NumberField::set_step(const int32_t new_step) {
+	step = new_step;
 }
 
 void NumberField::paint(Painter& painter) {
@@ -1232,7 +1334,7 @@ uint64_t SymField::value_hex_u64() {
 	
 	if (type_ != SYMFIELD_DEF) {
 		for (c = 0; c < length_; c++)
-			v += values_[c] << (4 * (length_ - 1 - c));
+			v += (uint64_t)(values_[c]) << (4 * (length_ - 1 - c));
 		return v;
 	} else 
 		return 0;
@@ -1365,7 +1467,7 @@ int32_t SymField::clip_value(const uint32_t index, const uint32_t value) {
 
 Waveform::Waveform(
 	Rect parent_rect,
-	int8_t * data,
+	int16_t * data,
 	uint32_t length,
 	uint32_t offset,
 	bool digital,
@@ -1378,6 +1480,16 @@ Waveform::Waveform(
 	color_ { color }
 {
 	//set_focusable(false);
+}
+
+void Waveform::set_cursor(const uint32_t i, const int16_t position) {
+	if (i < 2) {
+		if (position != cursors[i]) {
+			cursors[i] = position;
+			set_dirty();
+		}
+		show_cursors = true;
+	}
 }
 
 void Waveform::set_offset(const uint32_t new_offset) {
@@ -1395,28 +1507,26 @@ void Waveform::set_length(const uint32_t new_length) {
 }
 
 void Waveform::paint(Painter& painter) {
-	uint32_t n, point_count;
+	size_t n;
 	Coord y, y_offset = screen_rect().location().y();
 	Coord prev_x = screen_rect().location().x(), prev_y;
 	float x, x_inc;
 	Dim h = screen_rect().size().height();
-	int8_t * data_start = data_ + offset_;
+	const float y_scale = (float)(h - 1) / 65536.0;
+	int16_t * data_start = data_ + offset_;
 	
 	// Clear
 	painter.fill_rectangle(screen_rect(), Color::black());
 	
+	if (!length_) return;
+	
 	x_inc = (float)screen_rect().size().width() / length_;
-	point_count = length_;
-	const float y_scale = (float)(h - 1) / 256;		// TODO: Make variable
-	
-	if (!point_count) return;
-	
 	
 	if (digital_) {
 		// Digital waveform: each value is an horizontal line
 		x = 0;
 		h--;
-		for (n = 0; n < point_count; n++) {
+		for (n = 0; n < length_; n++) {
 			y = *(data_start++) ? h : 0;
 			
 			if (n) {
@@ -1432,15 +1542,26 @@ void Waveform::paint(Painter& painter) {
 	} else {
 		// Analog waveform: each value is a point's Y coordinate
 		x = prev_x + x_inc;
-		h = h / 2;
+		h /= 2;
 		prev_y = y_offset + h - (*(data_start++) * y_scale);
-		for (n = 1; n < point_count; n++) {
+		for (n = 1; n < length_; n++) {
 			y = y_offset + h - (*(data_start++) * y_scale);
 			display.draw_line( {prev_x, prev_y}, {(Coord)x, y}, color_);
 			
 			prev_x = x;
 			prev_y = y;
 			x += x_inc;
+		}
+	}
+	
+	// Cursors
+	if (show_cursors) {
+		for (n = 0; n < 2; n++) {
+			painter.draw_vline(
+				Point(std::min(screen_rect().size().width(), (int)cursors[n]), y_offset),
+				screen_rect().size().height(),
+				cursor_colors[n]
+				);
 		}
 	}
 }
@@ -1450,37 +1571,45 @@ void Waveform::paint(Painter& painter) {
 
 VuMeter::VuMeter(
 	Rect parent_rect,
-	uint32_t LEDs
+	uint32_t LEDs,
+	bool show_max
 ) : Widget { parent_rect },
 	LEDs_ { LEDs },
-	height { parent_rect.size().height() }
+	show_max_ { show_max }
 {
 	//set_focusable(false);
-	LED_height = height / LEDs;
+	LED_height = std::max(1UL, parent_rect.size().height() / LEDs);
 	split = 256 / LEDs;
 }
 
-void VuMeter::set_value(const uint8_t new_value) {
-	value_ = new_value;
-	set_dirty();
+void VuMeter::set_value(const uint32_t new_value) {
+	if ((new_value != value_) && (new_value < 256)) {
+		value_ = new_value;
+		set_dirty();
+	}
 }
 
-void VuMeter::set_mark(const uint8_t new_mark) {
-	if (new_mark != mark) {
+void VuMeter::set_mark(const uint32_t new_mark) {
+	if ((new_mark != mark) && (new_mark < 256)) {
 		mark = new_mark;
 		set_dirty();
 	}
 }
 
 void VuMeter::paint(Painter& painter) {
+	uint32_t bar;
+	Color color;
+	bool lit = false;
+	uint32_t bar_level;
 	Point pos = screen_rect().location();
-		Dim width = screen_rect().size().width() - 4;
+	Dim width = screen_rect().size().width() - 4;
+	Dim height = screen_rect().size().height();
+	Dim bottom = pos.y() + height;
+	Coord marks_x = pos.x() + width;
 	
 	if (value_ != prev_value) {
-		uint32_t bar;
-		Color color;
-		bool lit = false;
-		uint32_t bar_level = LEDs_ - ((value_ + 1) / split);
+		bar_level = LEDs_ - ((value_ + 1) / split);
+		
 		// Draw LEDs
 		for (bar = 0; bar < LEDs_; bar++) {
 			if (bar >= bar_level)
@@ -1495,39 +1624,40 @@ void VuMeter::paint(Painter& painter) {
 			else
 				color = lit ? Color::green() : Color::dark_green();
 			
-			painter.fill_rectangle({ pos.x(), pos.y() + (Coord)(bar * LED_height), width, (Coord)LED_height - 2 }, color);
+			painter.fill_rectangle({ pos.x(), pos.y() + (Coord)(bar * (LED_height + 1)), width, (Coord)LED_height }, color);
 		}
 		prev_value = value_;
 	}
 	
 	// Update max level
-	if (value_ > max) {
-		max = value_;
-		hold_timer = 30;	// 0.5s @ 60Hz
-	} else {
-		if (hold_timer) {
-			hold_timer--;
+	if (show_max_) {
+		if (value_ > max) {
+			max = value_;
+			hold_timer = 30;	// 0.5s @ 60Hz
 		} else {
-			if (max) max--;	// Let it drop
+			if (hold_timer) {
+				hold_timer--;
+			} else {
+				if (max) max--;	// Let it drop
+			}
+		}
+		
+		// Draw max level
+		if (max != prev_max) {
+			painter.draw_hline({ marks_x, bottom - (height * prev_max) / 256 }, 8, Color::black());
+			painter.draw_hline({ marks_x, bottom - (height * max) / 256 }, 8, Color::white());
+			if (prev_max == mark)
+				prev_mark = 0;	// Force mark refresh
+			prev_max = max;
 		}
 	}
 	
-	// Draw max level
-	if (max != prev_max) {
-		painter.draw_hline({ pos.x() + width, pos.y() + height - (height * prev_max) / 256 }, 8, Color::black());
-		painter.draw_hline({ pos.x() + width, pos.y() + height - (height * max) / 256 }, 8, Color::white());
-		if (prev_max == mark)
-			prev_mark = 0;	// Force mark refresh
+	// Draw mark (forced refresh)
+	if (mark) {
+		painter.draw_hline({ marks_x, bottom - (height * prev_mark) / 256 }, 8, Color::black());
+		painter.draw_hline({ marks_x, bottom - (height * mark) / 256 }, 8, Color::grey());
+		prev_mark = mark;
 	}
-	
-	// Draw mark
-	if ((mark != prev_mark) && (mark)) {
-		painter.draw_hline({ pos.x() + width, pos.y() + height - (height * prev_mark) / 256 }, 8, Color::black());
-		painter.draw_hline({ pos.x() + width, pos.y() + height - (height * mark) / 256 }, 8, Color::grey());
-	}
-	
-	prev_max = max;
-	prev_mark = mark;
 }
 
 } /* namespace ui */

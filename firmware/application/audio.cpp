@@ -23,11 +23,9 @@
 #include "audio.hpp"
 
 #include "portapack.hpp"
-using portapack::i2c0;
 using portapack::clock_manager;
 
-#include "wm8731.hpp"
-using wolfson::wm8731::WM8731;
+#include "portapack_hal.hpp"
 
 #include "i2s.hpp"
 using namespace lpc43xx;
@@ -36,7 +34,9 @@ namespace audio {
 
 namespace {
 
-constexpr i2s::ConfigTX i2s0_config_tx {
+// "Master": I2S peripheral generates SCK/WS, transmits to audio codec.
+
+constexpr i2s::ConfigTX i2s0_config_tx_master_base_clk {
 	.dao = i2s::DAO {
 		.wordwidth = i2s::WordWidth::Bits16,
 		.mono = 0,
@@ -58,9 +58,10 @@ constexpr i2s::ConfigTX i2s0_config_tx {
 		.four_pin = 0,
 		.mclk_out_en = 1,
 	},
+	.sck_in_sel = 1,
 };
 
-constexpr i2s::ConfigRX i2s0_config_rx {
+constexpr i2s::ConfigRX i2s0_config_rx_four_wire {
 	.dai = i2s::DAI {
 		.wordwidth = i2s::WordWidth::Bits16,
 		.mono = 0,
@@ -77,10 +78,38 @@ constexpr i2s::ConfigRX i2s0_config_rx {
 		.bitrate = 7,
 	},
 	.rxmode = i2s::Mode {
-		.clksel = i2s::ClockSelect::BaseAudioClkOrExternalMCLK,
+		.clksel = i2s::ClockSelect::FractionalDivider,
 		.four_pin = 1,
 		.mclk_out_en = 0,
 	},
+	.sck_in_sel = 0,
+};
+
+// "Slave": I2S controlled by external SCK/WS, received from audio codec.
+
+constexpr i2s::ConfigTX i2s0_config_tx_slave_base_clk {
+	.dao = i2s::DAO {
+		.wordwidth = i2s::WordWidth::Bits16,
+		.mono = 0,
+		.stop = 1,
+		.reset = 0,
+		.ws_sel = 1,
+		.ws_halfperiod = 0x0f,
+		.mute = 1,
+	},
+	.txrate = i2s::MCLKRate {
+		.x_divider = 0,
+		.y_divider = 0,
+	},
+	.txbitrate = i2s::BitRate {
+		.bitrate = 0,
+	},
+	.txmode = i2s::Mode {
+		.clksel = i2s::ClockSelect::FractionalDivider,
+		.four_pin = 0,
+		.mclk_out_en = 1,
+	},
+	.sck_in_sel = 1,
 };
 
 constexpr i2s::ConfigDMA i2s0_config_dma {
@@ -98,23 +127,9 @@ constexpr i2s::ConfigDMA i2s0_config_dma {
 	},
 };
 
-constexpr uint8_t wm8731_i2c_address = 0x1a;
-
-WM8731 audio_codec { i2c0, wm8731_i2c_address };
+static audio::Codec* audio_codec = nullptr;
 
 } /* namespace */
-
-namespace input {
-
-void start() {
-	i2s::i2s0::rx_start();
-}
-
-void stop() {
-	i2s::i2s0::rx_stop();
-}
-
-} /* namespace input */
 
 namespace output {
 
@@ -130,53 +145,81 @@ void stop() {
 
 void mute() {
 	i2s::i2s0::tx_mute();
-
-	audio_codec.headphone_mute();
+	audio_codec->headphone_disable();
 }
 
 void unmute() {
 	i2s::i2s0::tx_unmute();
+	audio_codec->headphone_enable();
 }
 
 } /* namespace output */
 
+namespace input {
+
+void start() {
+	audio_codec->microphone_enable();
+	i2s::i2s0::rx_start();
+}
+
+void stop() {
+	i2s::i2s0::rx_stop();
+	audio_codec->microphone_disable();
+}
+
+} /* namespace input */
+
 namespace headphone {
 
 volume_range_t volume_range() {
-	return wolfson::wm8731::headphone_gain_range;
+	return audio_codec->headphone_gain_range();
 }
 
 void set_volume(const volume_t volume) {
-	audio_codec.set_headphone_volume(volume);
+	audio_codec->set_headphone_volume(volume);
 }
 
 } /* namespace headphone */
 
 namespace debug {
 
-int reg_count() {
-	return wolfson::wm8731::reg_count;
+size_t reg_count() {
+	return audio_codec->reg_count();
 }
 
-uint16_t reg_read(const int register_number) {
-	return audio_codec.read(register_number);
+uint32_t reg_read(const size_t register_number) {
+	return audio_codec->reg_read(register_number);
+}
+
+std::string codec_name() {
+	return audio_codec->name();
+}
+
+size_t reg_bits() {
+	return audio_codec->reg_bits();
 }
 
 } /* namespace debug */
 
-void init() {
+void init(audio::Codec* const codec) {
 	clock_manager.start_audio_pll();
-	audio_codec.init();
 
+	// Configure I2S before activating codec interface.
 	i2s::i2s0::configure(
-		i2s0_config_tx,
-		i2s0_config_rx,
+		i2s0_config_tx_master_base_clk,
+		i2s0_config_rx_four_wire,
 		i2s0_config_dma
 	);
+
+	audio_codec = codec;
+	audio_codec->init();
+
+	// Set pin mode, since it's likely GPIO (as left after CPLD JTAG interactions).
+	portapack::pin_i2s0_rx_sda.mode(3);
 }
 
 void shutdown() {
-	audio_codec.reset();
+	audio_codec->reset();
 	output::stop();
 }
 

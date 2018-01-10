@@ -21,6 +21,8 @@
  */
 
 #include "proc_nfm_audio.hpp"
+#include "sine_table_int8.hpp"
+#include "portapack_shared_memory.hpp"
 
 #include "event_m4.hpp"
 
@@ -28,6 +30,8 @@
 #include <cstddef>
 
 void NarrowbandFMAudio::execute(const buffer_c8_t& buffer) {
+	//bool new_state;
+	
 	if( !configured ) {
 		return;
 	}
@@ -39,23 +43,63 @@ void NarrowbandFMAudio::execute(const buffer_c8_t& buffer) {
 	feed_channel_stats(channel_out);
 	channel_spectrum.feed(channel_out, channel_filter_pass_f, channel_filter_stop_f);
 
-	if (!pwmrssi_enabled) {
+	if (!pitch_rssi_enabled) {
+		// Normal mode, output demodulated audio
 		auto audio = demod.execute(channel_out, audio_buffer);
 		audio_output.write(audio);
-	} else {
-		for (c = 0; c < 32; c++) {
-			if (synth_acc < pwmrssi_avg)
-				pwmrssi_audio_buffer.p[c] = 32767;
-			else
-				pwmrssi_audio_buffer.p[c] = -32768;
+		
+		if (ctcss_detect_enabled) {
+			/* 24kHz int16_t[16]
+			 * -> FIR filter, <300Hz pass, >300Hz stop, gain of 1
+			 * -> 12kHz int16_t[8] */
+			auto audio_ctcss = ctcss_filter.execute(audio, work_audio_buffer);
 			
-			if (synth_acc < synth_div)
-				synth_acc++;
-			else
-				synth_acc = 0;
+			// s16 to f32 for hpf
+			std::array<float, 8> audio_f;
+			for (size_t i = 0; i < audio_ctcss.count; i++) {
+				audio_f[i] = audio_ctcss.p[i] * ki;
+			}
+			
+			hpf.execute_in_place(buffer_f32_t {
+				audio_f.data(),
+				audio_ctcss.count,
+				audio_ctcss.sampling_rate
+				});
+			
+			// Zero-crossing detection
+			for (size_t c = 0; c < audio_ctcss.count; c++) {
+				cur_sample = audio_f[c];
+				if (cur_sample * prev_sample < 0.0) {
+					z_acc += z_timer;
+					z_timer = 0;
+					z_count++;
+				} else
+					z_timer++;
+				prev_sample = cur_sample;
+			}
+			
+			if (z_count >= 30) {
+				ctcss_message.value = (100 * 12000 / 2 * z_count) / z_acc;
+				shared_memory.application_queue.push(ctcss_message);
+				z_count = 0;
+				z_acc = 0;
+			}
 		}
-
-		audio_output.write(pwmrssi_audio_buffer);
+	} else {
+		// Direction-finding mode; output tone with pitch related to RSSI
+		for (size_t c = 0; c < 16; c++) {
+			tone_buffer.p[c] = (sine_table_i8[(tone_phase & 0xFF000000U) >> 24]) * 128;
+			tone_phase += tone_delta;
+		}
+		
+		audio_output.write(tone_buffer);
+		
+		/*new_state = audio_output.is_squelched();
+		
+		if (new_state && !old_state)
+			shared_memory.application_queue.push(sig_message);
+		
+		old_state = new_state;*/	
 	}
 }
 
@@ -74,8 +118,8 @@ void NarrowbandFMAudio::on_message(const Message* const message) {
 		capture_config(*reinterpret_cast<const CaptureConfigMessage*>(message));
 		break;
 	
-	case Message::ID::PWMRSSIConfigure:
-		pwmrssi_config(*reinterpret_cast<const PWMRSSIConfigureMessage*>(message));
+	case Message::ID::PitchRSSIConfigure:
+		pitch_rssi_config(*reinterpret_cast<const PitchRSSIConfigureMessage*>(message));
 		break;
 		
 	default:
@@ -102,18 +146,17 @@ void NarrowbandFMAudio::configure(const NBFMConfigureMessage& message) {
 	channel_filter_pass_f = message.channel_filter.pass_frequency_normalized * channel_filter_input_fs;
 	channel_filter_stop_f = message.channel_filter.stop_frequency_normalized * channel_filter_input_fs;
 	channel_spectrum.set_decimation_factor(std::floor(channel_filter_output_fs / (channel_filter_pass_f + channel_filter_stop_f)));
-	audio_output.configure(message.audio_hpf_config, message.audio_deemph_config);	// , 0.8f
+	audio_output.configure(message.audio_hpf_config, message.audio_deemph_config, (float)message.squelch_level / 100.0);
 	
-	synth_acc = 0;
-	
+	hpf.configure(audio_24k_hpf_30hz_config);
+	ctcss_filter.configure(taps_64_lp_025_025.taps);
+
 	configured = true;
 }
 
-void NarrowbandFMAudio::pwmrssi_config(const PWMRSSIConfigureMessage& message) {
-	pwmrssi_enabled = message.enabled;
-	pwmrssi_avg = message.avg / 3;
-	synth_div = message.synth_div;
-	synth_acc = 0;
+void NarrowbandFMAudio::pitch_rssi_config(const PitchRSSIConfigureMessage& message) {
+	pitch_rssi_enabled = message.enabled;
+	tone_delta = (message.rssi + 1000) * ((1ULL << 32) / 24000);
 }
 
 void NarrowbandFMAudio::capture_config(const CaptureConfigMessage& message) {

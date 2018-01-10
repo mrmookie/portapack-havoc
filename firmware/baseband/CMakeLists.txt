@@ -136,6 +136,7 @@ set(CPPSRC
 	${COMMON}/chibios_cpp.cpp
 	${COMMON}/debug.cpp
 	${COMMON}/gcc.cpp
+	tone_gen.cpp
 )
 
 # C sources to be compiled in ARM mode regardless of the global setting.
@@ -275,19 +276,33 @@ macro(DeclareTargets chunk_tag name)
 	set(BASEBAND_IMAGES ${BASEBAND_IMAGES} ${PROJECT_NAME}.img)
 endmacro()
 
+### ADS-B RX
+
+set(MODE_CPPSRC
+	proc_adsbrx.cpp
+)
+DeclareTargets(PADR adsbrx)
+
 ### ADS-B TX
 
 set(MODE_CPPSRC
 	proc_adsbtx.cpp
 )
-DeclareTargets(PADS ads)
+DeclareTargets(PADT adsbtx)
 
 ### AFSK
 
 set(MODE_CPPSRC
 	proc_afsk.cpp
 )
-DeclareTargets(PAFS afsk)
+DeclareTargets(PAFT afsktx)
+
+### AFSK RX
+
+set(MODE_CPPSRC
+	proc_afskrx.cpp
+)
+DeclareTargets(PAFR afskrx)
 
 ### AIS
 
@@ -323,6 +338,13 @@ set(MODE_CPPSRC
 	proc_ert.cpp
 )
 DeclareTargets(PERT ert)
+
+### Radiosonde
+
+set(MODE_CPPSRC
+	proc_sonde.cpp
+)
+DeclareTargets(PSON sonde)
 
 ### FSK TX
 
@@ -387,12 +409,26 @@ set(MODE_CPPSRC
 )
 DeclareTargets(PREP replay)
 
+### Signal generator
+
+set(MODE_CPPSRC
+	proc_siggen.cpp
+)
+DeclareTargets(PSIG siggen)
+
 ### SSTV TX
 
 set(MODE_CPPSRC
 	proc_sstvtx.cpp
 )
 DeclareTargets(PSTX sstvtx)
+
+### Test
+
+set(MODE_CPPSRC
+	proc_test.cpp
+)
+DeclareTargets(PTST test)
 
 ### Tones
 
@@ -448,7 +484,7 @@ set(BASEBAND_IMAGES ${BASEBAND_IMAGES} terminator.img)
 #######################################################################
 
 project(baseband)
-
+	
 add_custom_command(
 	OUTPUT ${PROJECT_NAME}.img
 	COMMAND cat ${BASEBAND_IMAGES} > ${PROJECT_NAME}.img

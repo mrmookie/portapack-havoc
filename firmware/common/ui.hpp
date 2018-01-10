@@ -26,6 +26,8 @@
 
 namespace ui {
 
+#define DEG_TO_RAD(d) (d * (2 * pi) / 360.0)
+
 using Coord = int16_t;
 using Dim = int16_t;
 
@@ -68,36 +70,49 @@ struct Color {
 		return { 255,   0,   0 };
 	}
 	static constexpr Color dark_red() {
-		return { 127,   0,   0 };
+		return { 191,   0,   0 };
 	}
 	
 	static constexpr Color orange() {
 		return { 255, 175,   0 };
 	}
 	static constexpr Color dark_orange() {
-		return { 127, 88,   0 };
+		return { 191,  88,   0 };
 	}
 
 	static constexpr Color yellow() {
 		return { 255, 255,   0 };
 	}
 	static constexpr Color dark_yellow() {
-		return { 127, 127,   0 };
+		return { 191, 191,   0 };
 	}
 
 	static constexpr Color green() {
 		return {   0, 255,   0 };
 	}
 	static constexpr Color dark_green() {
-		return {   0, 127,   0 };
+		return {   0, 191,   0 };
 	}
 
 	static constexpr Color blue() {
 		return {   0,   0, 255 };
 	}
+	static constexpr Color dark_blue() {
+		return {   0,	0, 191 };
+	}
 	
 	static constexpr Color cyan() {
-		return {   0,   255, 255 };
+		return {   0, 255, 255 };
+	}
+	static constexpr Color dark_cyan() {
+		return {   0, 191, 191 };
+	}
+	
+	static constexpr Color magenta() {
+		return { 255,   0, 255 };
+	}
+	static constexpr Color dark_magenta() {
+		return { 191,   0, 191 };
 	}
 
 	static constexpr Color white() {
@@ -105,19 +120,21 @@ struct Color {
 	}
 	
 	static constexpr Color light_grey() {
-		return { 127, 127, 127 };
+		return { 191, 191, 191 };
 	}
 	static constexpr Color grey() {
-		return { 91, 91, 91 };
+		return { 127, 127, 127 };
 	}
 	static constexpr Color dark_grey() {
-		return { 63, 63, 63 };
+		return {  63,  63,  63 };
 	}
 	
 	static constexpr Color purple() {
-		return { 204, 0, 102 };
+		return { 204,  0, 102 };
 	}
 };
+
+extern Color term_colors[16];
 
 struct ColorRGB888 {
 	uint8_t r;
@@ -322,6 +339,8 @@ struct TouchEvent {
 	Point point;
 	Type type;
 };
+
+Point polar_to_point(float angle, uint32_t distance);
 
 } /* namespace ui */
 

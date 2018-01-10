@@ -40,8 +40,8 @@ public:
 		std::unique_ptr<stream::Reader> reader,
 		size_t read_size,
 		size_t buffer_count,
-		std::function<void()> success_callback,
-		std::function<void(File::Error)> error_callback
+		bool* ready_signal,
+		std::function<void(uint32_t return_code)> terminate_callback
 	);
 	~ReplayThread();
 
@@ -52,18 +52,24 @@ public:
 
 	const ReplayConfig& state() const {
 		return config;
-	}
+	};
+
+	enum replaythread_return {
+		READ_ERROR = 0,
+		END_OF_FILE,
+		TERMINATED
+	};
 
 private:
 	ReplayConfig config;
 	std::unique_ptr<stream::Reader> reader;
-	std::function<void()> success_callback;
-	std::function<void(File::Error)> error_callback;
+	bool* ready_sig;
+	std::function<void(uint32_t return_code)> terminate_callback;
 	Thread* thread { nullptr };
 
 	static msg_t static_fn(void* arg);
 
-	Optional<File::Error> run();
+	uint32_t run();
 };
 
 #endif/*__REPLAY_THREAD_H__*/

@@ -25,6 +25,30 @@
 namespace wolfson {
 namespace wm8731 {
 
+void WM8731::configure_interface_i2s_slave() {
+	write(DigitalAudioInterfaceFormat {
+		.format = 2,
+		.iwl = 0,
+		.lrp = 0,
+		.lrswap = 0,
+		.ms = 0,
+		.bclkinv = 0,
+		.reserved0 = 0,
+	});
+}
+
+void WM8731::configure_interface_i2s_master() {
+	write(DigitalAudioInterfaceFormat {
+		.format = 2,
+		.iwl = 0,
+		.lrp = 0,
+		.lrswap = 0,
+		.ms = 1,
+		.bclkinv = 0,
+		.reserved0 = 0,
+	});
+}
+
 void WM8731::init() {
 	reset();
 
@@ -49,15 +73,7 @@ void WM8731::init() {
 	// 	.reserved0 = 0,
 	// });
 
-	write(DigitalAudioInterfaceFormat {
-		.format = 2,
-		.iwl = 0,
-		.lrp = 0,
-		.lrswap = 0,
-		.ms = 0,
-		.bclkinv = 0,
-		.reserved0 = 0,
-	});
+	configure_interface_i2s_slave();
 
 	write(DigitalAudioPathControl {
 		.adchpd = 0,
@@ -87,24 +103,28 @@ void WM8731::init() {
 	headphone_mute();
 }
 
-void WM8731::reset() {
-	write(0x0f, 0);
+bool WM8731::detected() {
+	return reset();
 }
 
-void WM8731::write(const Register reg) {
-	write(toUType(reg), map.w[toUType(reg)]);
+bool WM8731::reset() {
+	return write(0x0f, 0);
 }
 
-void WM8731::write(const address_t reg_address, const reg_t value) {
+bool WM8731::write(const Register reg) {
+	return write(toUType(reg), map.w[toUType(reg)]);
+}
+
+bool WM8731::write(const address_t reg_address, const reg_t value) {
 	const uint16_t word = (reg_address << 9) | value;
 	const std::array<uint8_t, 2> values {
 		static_cast<uint8_t>(word >> 8),
 		static_cast<uint8_t>(word & 0xff),
 	};
-	bus.transmit(bus_address, values.data(), values.size());
+	return bus.transmit(bus_address, values.data(), values.size());
 }
 
-reg_t WM8731::read(const address_t reg_address) {
+uint32_t WM8731::reg_read(const size_t reg_address) {
 	return map.w[reg_address];
 }
 

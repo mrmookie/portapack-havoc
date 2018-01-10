@@ -197,6 +197,26 @@ std::vector<std::filesystem::path> scan_root_directories(const std::filesystem::
 	return directory_list;
 }
 
+void delete_file(const std::filesystem::path& file_path) {
+	f_unlink(reinterpret_cast<const TCHAR*>(file_path.c_str()));
+}
+
+void rename_file(const std::filesystem::path& file_path, const std::filesystem::path& new_name) {
+	f_rename(reinterpret_cast<const TCHAR*>(file_path.c_str()), reinterpret_cast<const TCHAR*>(new_name.c_str()));
+}
+
+FATTimestamp file_created_date(const std::filesystem::path& file_path) {
+	FILINFO filinfo;
+	
+	f_stat(reinterpret_cast<const TCHAR*>(file_path.c_str()), &filinfo);
+	
+	return { filinfo.fdate, filinfo.ftime };
+}
+
+uint32_t make_new_directory(const std::filesystem::path& dir_path) {
+	return f_mkdir(reinterpret_cast<const TCHAR*>(dir_path.c_str()));
+}
+
 namespace std {
 namespace filesystem {
 
@@ -205,7 +225,7 @@ std::string filesystem_error::what() const {
 	case FR_OK: 					return "ok";
 	case FR_DISK_ERR:				return "disk error";
 	case FR_INT_ERR:				return "insanity detected";
-	case FR_NOT_READY:				return "not ready";
+	case FR_NOT_READY:				return "SD card not ready";
 	case FR_NO_FILE:				return "no file";
 	case FR_NO_PATH:				return "no path";
 	case FR_INVALID_NAME:			return "invalid name";

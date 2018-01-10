@@ -20,6 +20,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
+#include <vector>
 #include <cstring>
 #include <string>
 
@@ -29,10 +30,16 @@
 namespace encoders {
 	
 	#define ENC_TYPES_COUNT 14
+	#define OOK_SAMPLERATE	2280000U
+	
+	#define ENCODER_UM3750	8
+	
+	size_t make_bitstream(std::string& fragments);
+	void bitstream_append(size_t& bitstream_length, uint32_t bit_count, uint32_t bits);
 
 	struct encoder_def_t {
 		std::string name;						// Encoder chip ref/name
-		std::string address_symbols;			// "01", "01F"...
+		std::string address_symbols;			// List of possible symbols like "01", "01F"...
 		std::string data_symbols;				// Same
 		uint16_t clk_per_symbol;				// Oscillator periods per symbol
 		uint16_t clk_per_fragment;				// Oscillator periods per symbol fragment (state)
@@ -45,7 +52,7 @@ namespace encoders {
 		uint16_t pause_symbols;					// Length of pause between repeats in symbols
 	};
 
-	// Warning ! If this is changed, make sure that the UM3750 index is still good in ui_bht_tx.cpp !
+	// Warning ! If this is changed, make sure that ENCODER_UM3750 is still valid !
 	const encoder_def_t encoder_defs[ENC_TYPES_COUNT] = {
 		// PT2260-R2
 		{
@@ -150,9 +157,9 @@ namespace encoders {
 			96, 32,
 			{ "011", "001" },
 			12,	"SAAAAAAAAAAAA",
-			"1",
+			"001",
 			100000,	4,
-			0	// ?
+			(3 * 12) - 6	// Compensates for pause delay bug in proc_ook
 		},
 		
 		// UM3758

@@ -21,10 +21,6 @@
 
 #include "buffer_exchange.hpp"
 
-// DEBUG:
-#include "hackrf_gpio.hpp"
-using namespace hackrf::one;
-
 BufferExchange* BufferExchange::obj { nullptr };
 
 BufferExchange::BufferExchange(
@@ -56,9 +52,7 @@ BufferExchange::~BufferExchange() {
 StreamBuffer* BufferExchange::get(FIFO<StreamBuffer*>* fifo) {
 	while(true) {
 		StreamBuffer* p { nullptr };
-		fifo->out(p);	// This crashes replay
-		
-		//led_tx.on();	// DEBUG
+		fifo->out(p);
 		
 		if( p ) {
 			return p;
@@ -70,4 +64,11 @@ StreamBuffer* BufferExchange::get(FIFO<StreamBuffer*>* fifo) {
 		chSchGoSleepS(THD_STATE_SUSPENDED);
 		chSysUnlock();
 	}
+}
+
+StreamBuffer* BufferExchange::get_prefill(FIFO<StreamBuffer*>* fifo) {
+	StreamBuffer* p { nullptr };
+	fifo->out(p);
+	
+	return p;
 }

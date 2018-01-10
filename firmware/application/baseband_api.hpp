@@ -48,7 +48,7 @@ struct NBFMConfig {
 	const fir_taps_real<32> channel;
 	const size_t deviation;
 
-	void apply() const;
+	void apply(const uint8_t squelch_level) const;
 };
 
 struct WFMConfig {
@@ -61,12 +61,13 @@ void set_tones_config(const uint32_t bw, const uint32_t pre_silence, const uint1
 void kill_tone();
 void set_sstv_data(const uint8_t vis_code, const uint32_t pixel_duration);
 void set_audiotx_data(const uint32_t divider, const uint32_t bw, const uint32_t gain_x10,
-					const bool ctcss_enabled, const uint32_t ctcss_phase_inc);
+					const uint32_t tone_key_delta, const float tone_key_mix_weight);
 void set_fifo_data(const int8_t * data);
-void set_pwmrssi(int32_t avg, bool enabled);
+void set_pitch_rssi(int32_t avg, bool enabled);
 void set_afsk_data(const uint32_t afsk_samples_per_bit, const uint32_t afsk_phase_inc_mark, const uint32_t afsk_phase_inc_space,
 					const uint8_t afsk_repeat, const uint32_t afsk_bw, const uint8_t symbol_count);
 void kill_afsk();
+void set_afsk(const uint32_t baudrate, const uint32_t word_length, const uint32_t trigger_value, const bool trigger_word);
 void set_ook_data(const uint32_t stream_length, const uint32_t samples_per_bit, const uint8_t repeat,
 					const uint32_t pause_symbols);
 void set_fsk_data(const uint32_t stream_length, const uint32_t samples_per_bit, const uint32_t shift,
@@ -76,6 +77,8 @@ void set_adsb();
 void set_jammer(const bool run, const jammer::JammerType type, const uint32_t speed);
 void set_rds_data(const uint16_t message_length);
 void set_spectrum(const size_t sampling_rate, const size_t trigger);
+void set_siggen_tone(const uint32_t tone);
+void set_siggen_config(const uint32_t bw, const uint32_t shape, const uint32_t duration);
 void request_beep();
 
 void run_image(const portapack::spi_flash::image_tag_t image_tag);

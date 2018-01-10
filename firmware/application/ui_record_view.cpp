@@ -36,21 +36,20 @@ using namespace portapack;
 
 namespace ui {
 
-void RecordView::toggle_pwmrssi() {
-	pwmrssi_enabled = !pwmrssi_enabled;
+void RecordView::toggle_pitch_rssi() {
+	pitch_rssi_enabled = !pitch_rssi_enabled;
 	
 	// Send to RSSI widget
-	const PWMRSSIConfigureMessage message {
-		pwmrssi_enabled,
-		64,
+	const PitchRSSIConfigureMessage message {
+		pitch_rssi_enabled,
 		0
 	};
 	shared_memory.application_queue.push(message);
 	
-	if( !pwmrssi_enabled ) {
-		button_pwmrssi.set_foreground(Color::orange());
+	if( !pitch_rssi_enabled ) {
+		button_pitch_rssi.set_foreground(Color::orange());
 	} else {
-		button_pwmrssi.set_foreground(Color::green());
+		button_pitch_rssi.set_foreground(Color::green());
 	}
 }
 
@@ -68,7 +67,7 @@ RecordView::RecordView(
 {
 	add_children({
 		&rect_background,
-		&button_pwmrssi,
+		&button_pitch_rssi,
 		&button_record,
 		&text_record_filename,
 		&text_record_dropped,
@@ -77,8 +76,8 @@ RecordView::RecordView(
 
 	rect_background.set_parent_rect({ { 0, 0 }, size() });
 	
-	button_pwmrssi.on_select = [this](ImageButton&) {
-		this->toggle_pwmrssi();
+	button_pitch_rssi.on_select = [this](ImageButton&) {
+		this->toggle_pitch_rssi();
 	};
 
 	button_record.on_select = [this](ImageButton&) {
@@ -145,7 +144,11 @@ void RecordView::start() {
 	case FileType::WAV:
 		{
 			auto p = std::make_unique<WAVFileWriter>();
-			auto create_error = p->create(base_path.replace_extension(u".WAV"), sampling_rate);
+			auto create_error = p->create(
+				base_path.replace_extension(u".WAV"),
+				sampling_rate,
+				to_string_dec_uint(receiver_model.tuning_frequency()) + "Hz"
+			);
 			if( create_error.is_valid() ) {
 				handle_error(create_error.value());
 			} else {
@@ -234,8 +237,8 @@ void RecordView::update_status_display() {
 		text_record_dropped.set(s);
 	}
 	
-	if (pwmrssi_enabled) {
-		button_pwmrssi.invert_colors();
+	if (pitch_rssi_enabled) {
+		button_pitch_rssi.invert_colors();
 	}
 
 	if( sampling_rate ) {

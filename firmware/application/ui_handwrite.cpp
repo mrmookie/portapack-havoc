@@ -26,7 +26,7 @@
 #include "hackrf_hal.hpp"
 #include "portapack_shared_memory.hpp"
 
-#include <cstring>
+#include <algorithm>
 
 using namespace portapack;
 
@@ -38,28 +38,17 @@ void HandWriteView::paint(Painter& painter) {
 
 HandWriteView::HandWriteView(
 	NavigationView& nav,
-	std::string& txt,
+	std::string * str,
 	size_t max_length
-) : _max_length(max_length)
+) : TextEntryView(nav, str, max_length)
 {
-	const char special_chars[5] = {'\'', '.', '?', '!', '='}; 
 	size_t n;
 	
 	// Handwriting alphabet definition here
 	handwriting = &handwriting_unistroke;
-	
-	txtidx = txt.length();
-	txtinput = txt;
-	n = txtidx;
-	while (n && (txtinput[n - 1] == ' ')) {
-		txtinput[--n] = 0;
-		txtidx--;
-	}
 
 	add_children({
-		&text_input,
-		&button_case,
-		&button_ok
+		&button_case
 	});
 
 	const auto button_fn = [this](Button& button) {
@@ -110,9 +99,9 @@ HandWriteView::HandWriteView(
 		}
 	};
 
-	button_ok.on_select = [this, &nav, &txt, max_length](Button&) {
-		txt = txtinput;
-		if (on_changed) on_changed(this->value());
+	button_ok.on_select = [this, &nav](Button&) {
+		if (on_changed)
+			on_changed(_str);
 		nav.pop();
 	};
 
@@ -226,9 +215,8 @@ void HandWriteView::guess_letter() {
 					char_add('A' + symbol - 1);
 				clear_zone(Color::green(), true);	// Green flash
 			} else {
-				if (txtidx) {
-					txtidx--;
-					txtinput[txtidx] = 0;			// Erase
+				if (_cursor_pos) {
+					char_delete();
 					clear_zone(Color::yellow(), true);	// Yellow flash
 				} else {
 					clear_zone(Color::red(), true);		// Red flash
@@ -259,26 +247,7 @@ void HandWriteView::sample_pen() {
 	int16_t diff_x, diff_y;
 	uint8_t dir, dir_ud, dir_lr, stroke_prev;
 	
-	// Blink cursor
-	if (!(sample_skip & 15)) {
-		Point cursor_pos;
-		
-		cursor_pos = {text_input.screen_rect().location().x() + (txtidx * 8),
-						text_input.screen_rect().location().y() + 16 - 4};
-		
-		if (cursor) {
-			display.fill_rectangle(
-				{cursor_pos, {text_input.screen_rect().size().width() - cursor_pos.x(), 4}},
-				Color::black()
-			);
-		} else {
-			display.fill_rectangle(
-				{cursor_pos, {8, 4}},
-				Color::white()
-			);
-		}
-		cursor = !cursor;	
-	}
+	draw_cursor();
 	
 	if (flash_timer) {
 		if (flash_timer == 1) clear_zone(Color::black(), false);
@@ -382,25 +351,9 @@ void HandWriteView::on_show() {
 	clear_zone(Color::black(), false);
 }
 
-std::string HandWriteView::value() {
-	txtinput[txtidx] = 0;
-	return txtinput;
-}
-
 void HandWriteView::on_button(Button& button) {
 	char_add(button.id);
 	update_text();
-}
-
-void HandWriteView::char_add(const char c) {
-	if (txtidx >= _max_length) return;
-	
-	txtinput[txtidx] = c;
-	txtidx++;
-}
-
-void HandWriteView::update_text() {
-	text_input.set(txtinput);
 }
 
 }

@@ -61,8 +61,6 @@ void set_modem_baudrate(const int32_t new_value);
 
 uint8_t modem_repeat();
 void set_modem_repeat(const uint32_t new_value);
-int32_t modem_bw();
-void set_modem_bw(const int32_t new_value);
 
 uint32_t playing_dead();
 void set_playing_dead(const uint32_t new_value);
@@ -71,15 +69,18 @@ uint32_t playdead_sequence();
 void set_playdead_sequence(const uint32_t new_value);
 
 bool stealth_mode();
-void set_stealth_mode(const bool new_value);
+void set_stealth_mode(const bool v);
 
-uint32_t ui_config();
-void set_ui_config(const uint32_t new_value);
+bool config_splash();
+bool config_login();
+uint32_t config_backlight_timer();
 
-uint16_t ui_config_bloff();
+void set_config_splash(bool v);
+void set_config_login(bool v);
+void set_config_backlight_timer(uint32_t i);
 
-uint8_t ui_config_textentry();
-void set_config_textentry(uint8_t new_value);
+//uint8_t ui_config_textentry();
+//void set_config_textentry(uint8_t new_value);
 
 uint32_t pocsag_last_address();
 void set_pocsag_last_address(uint32_t address);

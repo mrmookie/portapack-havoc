@@ -72,8 +72,11 @@ set(USE_FPU no)
 # Project, sources and paths
 #
 
-set(CPLD_SVF_PATH ${HARDWARE_PATH}/portapack_h1/cpld/output_files/portapack_h1_cpld.svf)
-set(CPLD_DATA_CPP ${CMAKE_CURRENT_BINARY_DIR}/portapack_cpld_data.cpp)
+set(CPLD_20150901_SVF_PATH ${HARDWARE_PATH}/portapack_h1/cpld/20150901/output_files/portapack_h1_cpld.svf)
+set(CPLD_20150901_DATA_CPP ${CMAKE_CURRENT_BINARY_DIR}/portapack_cpld_20150901_data.cpp)
+
+set(CPLD_20170522_SVF_PATH ${HARDWARE_PATH}/portapack_h1/cpld/20170522/output_files/portapack_h1_cpld.svf)
+set(CPLD_20170522_DATA_CPP ${CMAKE_CURRENT_BINARY_DIR}/portapack_cpld_20170522_data.cpp)
 
 set(HACKRF_CPLD_DATA_HPP ${CMAKE_CURRENT_BINARY_DIR}/hackrf_cpld_data.hpp)
 set(HACKRF_CPLD_DATA_CPP ${CMAKE_CURRENT_BINARY_DIR}/hackrf_cpld_data.cpp)
@@ -106,141 +109,162 @@ set(CSRC
 # setting.
 set(CPPSRC
 	main.cpp
-	irq_lcd_frame.cpp
-	irq_controls.cpp
-	irq_rtc.cpp
-	${COMMON}/event.cpp
-	event_m0.cpp
-	${COMMON}/message_queue.cpp
-	${COMMON}/hackrf_hal.cpp
-	portapack.cpp
-	${COMMON}/portapack_shared_memory.cpp
-	baseband_api.cpp
-	${COMMON}/portapack_persistent_memory.cpp
-	${COMMON}/portapack_io.cpp
-	${COMMON}/i2c_pp.cpp
-	spi_pp.cpp
-	clock_manager.cpp
-	si5351.cpp
-	${COMMON}/wm8731.cpp
-	radio.cpp
-	baseband_cpld.cpp
-	tuning.cpp
-	rf_path.cpp
-	rffc507x.cpp
-	rffc507x_spi.cpp
-	max2837.cpp
-	max5864.cpp
-	${COMMON}/buffer.cpp
-	debounce.cpp
-	touch.cpp
-	touch_adc.cpp
-	protocols/adsb.cpp
-	protocols/bht.cpp
-	protocols/dcs.cpp
-	protocols/lcr.cpp
-	protocols/rds.cpp
-	serializer.cpp
-	modems.cpp
-	audio.cpp
-	${COMMON}/bch_code.cpp
-	ctcss.cpp
-	encoder.cpp
-	freqman.cpp
-	${COMMON}/lcd_ili9341.cpp
-	${COMMON}/ui.cpp
-	${COMMON}/ui_text.cpp
-	${COMMON}/ui_widget.cpp
-	${COMMON}/ui_painter.cpp
-	${COMMON}/ui_focus.cpp
-	ui_about.cpp
-	ui_adsbtx.cpp
-	ui_modemsetup.cpp
-	ui_alphanum.cpp
-	ui_audio.cpp
-	ui_mictx.cpp
-	ui_baseband_stats_view.cpp
-	ui_bht_tx.cpp
-	ui_channel.cpp
-	ui_closecall.cpp
-	ui_coasterp.cpp
-	ui_cw.cpp
-	ui_debug.cpp
-	ui_encoders.cpp
-	ui_font_fixed_8x16.cpp
-	ui_freqman.cpp
-	ui_handwrite.cpp
-	ui_jammer.cpp
-	ui_lcr.cpp
-	ui_menu.cpp
-	ui_morse.cpp
-	ui_navigation.cpp
-	ui_numbers.cpp
-	ui_nuoptix.cpp
-	ui_playdead.cpp
-	ui_pocsag_tx.cpp
-	ui_rds.cpp
-	ui_receiver.cpp
-	ui_record_view.cpp
-	ui_replay_view.cpp
-	ui_rssi.cpp
-	# ui_script.cpp
-	ui_sd_card_status_view.cpp
-	ui_sd_wipe.cpp
-	# ui_sd_card_debug.cpp
-	ui_setup.cpp
-	ui_soundboard.cpp
-	ui_spectrum.cpp
-	ui_sstvtx.cpp
-	ui_textentry.cpp
-	ui_touch_calibration.cpp
-	ui_transmitter.cpp
-	ui_whipcalc.cpp
-	ui_whistle.cpp
-	# ui_loadmodule.cpp
-	recent_entries.cpp
-	receiver_model.cpp
-	transmitter_model.cpp
-	spectrum_color_lut.cpp
-	analog_audio_app.cpp
+	${COMMON}/adsb.cpp
+	${COMMON}/adsb_frame.cpp
 	${COMMON}/ais_baseband.cpp
 	${COMMON}/ais_packet.cpp
-	${COMMON}/pocsag_packet.cpp
-	${COMMON}/pocsag.cpp
-	${COMMON}/morse.cpp
-	ais_app.cpp
-	tpms_app.cpp
-	pocsag_app.cpp
-	${COMMON}/tpms_packet.cpp
-	ert_app.cpp
-	${COMMON}/ert_packet.cpp
-	capture_app.cpp
-	replay_app.cpp
-	sd_card.cpp
-	rtc_time.cpp
-	file.cpp
-	log_file.cpp
-	${COMMON}/png_writer.cpp
+	${COMMON}/ak4951.cpp
+	${COMMON}/backlight.cpp
+	${COMMON}/baseband_cpld.cpp
+	${COMMON}/bch_code.cpp
+	${COMMON}/buffer.cpp
 	${COMMON}/buffer_exchange.cpp
-	capture_thread.cpp
-	replay_thread.cpp
-	io_file.cpp
-	io_wave.cpp
-	${COMMON}/manchester.cpp
-	string_format.cpp
-	temperature_logger.cpp
-	${COMMON}/utility.cpp
 	${COMMON}/chibios_cpp.cpp
-	${COMMON}/debug.cpp
-	${COMMON}/gcc.cpp
-	${COMMON}/lfsr_random.cpp
-	core_control.cpp
 	${COMMON}/cpld_max5.cpp
+	${COMMON}/cpld_update.cpp
 	${COMMON}/cpld_xilinx.cpp
+	${COMMON}/debug.cpp
+	${COMMON}/ert_packet.cpp
+	${COMMON}/event.cpp
+	${COMMON}/gcc.cpp
+	${COMMON}/hackrf_hal.cpp
+	${COMMON}/i2c_pp.cpp
 	${COMMON}/jtag.cpp
 	${COMMON}/jtag_tap.cpp
-	cpld_update.cpp
-	${CPLD_DATA_CPP}
+	${COMMON}/lcd_ili9341.cpp
+	${COMMON}/lfsr_random.cpp
+	${COMMON}/manchester.cpp
+	${COMMON}/message_queue.cpp
+	${COMMON}/morse.cpp
+	${COMMON}/png_writer.cpp
+	${COMMON}/pocsag.cpp
+	${COMMON}/pocsag_packet.cpp
+	${COMMON}/portapack_io.cpp
+	${COMMON}/portapack_persistent_memory.cpp
+	${COMMON}/portapack_shared_memory.cpp
+	${COMMON}/sonde_packet.cpp
+	${COMMON}/test_packet.cpp
+	${COMMON}/tpms_packet.cpp
+	${COMMON}/ui.cpp
+	${COMMON}/ui_focus.cpp
+	${COMMON}/ui_painter.cpp
+	${COMMON}/ui_text.cpp
+	${COMMON}/ui_widget.cpp
+	${COMMON}/utility.cpp
+	${COMMON}/wm8731.cpp
+	audio.cpp
+	baseband_api.cpp
+	capture_thread.cpp
+	clock_manager.cpp
+	core_control.cpp
+	de_bruijn.cpp
+	emu_cc1101.cpp
+	event_m0.cpp
+	file.cpp
+	freqman.cpp
+	io_file.cpp
+	io_wave.cpp
+	irq_controls.cpp
+	irq_lcd_frame.cpp
+	irq_rtc.cpp
+	log_file.cpp
+	portapack.cpp
+	radio.cpp
+	receiver_model.cpp
+	recent_entries.cpp
+	replay_thread.cpp
+	rf_path.cpp
+	rtc_time.cpp
+	sd_card.cpp
+	serializer.cpp
+	spectrum_color_lut.cpp
+	string_format.cpp
+	temperature_logger.cpp
+	touch.cpp
+	tone_key.cpp
+	transmitter_model.cpp
+	tuning.cpp
+	hw/debounce.cpp
+	hw/encoder.cpp
+	hw/max2837.cpp
+	hw/max5864.cpp
+	hw/rffc507x.cpp
+	hw/rffc507x_spi.cpp
+	hw/si5351.cpp
+	hw/spi_pp.cpp
+	hw/touch_adc.cpp
+	ui_baseband_stats_view.cpp
+	ui_navigation.cpp
+	ui_playdead.cpp
+	ui_record_view.cpp
+	ui_sd_card_status_view.cpp
+	ui/ui_alphanum.cpp
+	ui/ui_audio.cpp
+	ui/ui_channel.cpp
+	ui/ui_font_fixed_8x16.cpp
+	ui/ui_geomap.cpp
+	ui/ui_menu.cpp
+	ui/ui_receiver.cpp
+	ui/ui_rssi.cpp
+	ui/ui_spectrum.cpp
+	ui/ui_tabview.cpp
+	ui/ui_textentry.cpp
+	ui/ui_transmitter.cpp
+	apps/ui_about.cpp
+	apps/ui_adsb_rx.cpp
+	apps/ui_adsb_tx.cpp
+	apps/ui_afsk_rx.cpp
+	apps/ui_aprs_tx.cpp
+	apps/ui_bht_tx.cpp
+	apps/ui_coasterp.cpp
+	apps/ui_debug.cpp
+	apps/ui_encoders.cpp
+	apps/ui_fileman.cpp
+	apps/ui_freqman.cpp
+	apps/ui_jammer.cpp
+	apps/ui_keyfob.cpp
+	apps/ui_lcr.cpp
+	apps/ui_mictx.cpp
+	apps/ui_modemsetup.cpp
+	apps/ui_morse.cpp
+	apps/ui_nuoptix.cpp
+	apps/ui_pocsag_tx.cpp
+	apps/ui_rds.cpp
+	apps/ui_scanner.cpp
+	apps/ui_sd_wipe.cpp
+	apps/ui_setup.cpp
+	apps/ui_siggen.cpp
+	apps/ui_sonde.cpp
+	apps/ui_soundboard.cpp
+	apps/ui_sstvtx.cpp
+	apps/ui_test.cpp
+	apps/ui_touch_calibration.cpp
+	apps/ui_touchtunes.cpp
+	apps/ui_view_wav.cpp
+	apps/ui_whipcalc.cpp
+	apps/analog_audio_app.cpp
+	apps/ais_app.cpp
+	apps/tpms_app.cpp
+	apps/pocsag_app.cpp
+	apps/ert_app.cpp
+	apps/capture_app.cpp
+	apps/replay_app.cpp
+	protocols/aprs.cpp
+	protocols/ax25.cpp
+	protocols/bht.cpp
+	protocols/dcs.cpp
+	protocols/encoders.cpp
+	protocols/lcr.cpp
+	protocols/modems.cpp
+	protocols/rds.cpp
+	# ui_handwrite.cpp
+	# ui_loadmodule.cpp
+	# ui_numbers.cpp
+	# ui_replay_view.cpp
+	# ui_script.cpp
+	# ui_sd_card_debug.cpp
+	${CPLD_20150901_DATA_CPP}
+	${CPLD_20170522_DATA_CPP}
 	${HACKRF_CPLD_DATA_CPP}
 )
 
@@ -271,8 +295,11 @@ set(INCDIR ${CMAKE_CURRENT_BINARY_DIR} ${COMMON} ${PORTINC} ${KERNINC} ${TESTINC
 	${HALINC} ${PLATFORMINC} ${BOARDINC}
 	${FATFSINC}
 	${CHIBIOS}/os/various
-	bitmaps
+	ui
+	hw
+	apps
 	protocols
+	bitmaps
 )
 
 #
@@ -359,14 +386,20 @@ include(${RULESPATH}/rules.cmake)
 ##############################################################################
 
 add_custom_command(
-	OUTPUT ${CPLD_DATA_CPP}
-	COMMAND ${EXTRACT_CPLD_DATA} ${CPLD_SVF_PATH} >${CPLD_DATA_CPP}
-	DEPENDS ${EXTRACT_CPLD_DATA} ${CPLD_SVF_PATH}
+	OUTPUT ${CPLD_20150901_DATA_CPP}
+	COMMAND ${EXTRACT_CPLD_DATA} ${CPLD_20150901_SVF_PATH} rev_20150901 >${CPLD_20150901_DATA_CPP}
+	DEPENDS ${EXTRACT_CPLD_DATA} ${CPLD_20150901_SVF_PATH}
+)
+
+add_custom_command(
+	OUTPUT ${CPLD_20170522_DATA_CPP}
+	COMMAND ${EXTRACT_CPLD_DATA} ${CPLD_20170522_SVF_PATH} rev_20170522 >${CPLD_20170522_DATA_CPP}
+	DEPENDS ${EXTRACT_CPLD_DATA} ${CPLD_20170522_SVF_PATH}
 )
 
 add_custom_command(
 	OUTPUT ${HACKRF_CPLD_DATA_HPP} ${HACKRF_CPLD_DATA_CPP}
-	COMMAND ${EXTRACT_SVF_DATA_XC2C64A} ${HACKRF_CPLD_SVF_PATH} hackrf::one::cpld::verify_blocks ${HACKRF_CPLD_DATA_HPP} ${HACKRF_CPLD_DATA_CPP}
+	COMMAND ${EXTRACT_SVF_DATA_XC2C64A} ${HACKRF_CPLD_SVF_PATH} hackrf::one::cpld::verify_blocks ${HACKRF_CPLD_DATA_CPP}
 	DEPENDS ${EXTRACT_SVF_DATA_XC2C64A} ${HACKRF_CPLD_SVF_PATH}
 )
 

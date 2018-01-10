@@ -29,30 +29,38 @@
 #ifndef __FREQMAN_H__
 #define __FREQMAN_H__
 
+#define FREQMAN_DESC_MAX_LEN 30
+#define FREQMAN_MAX_PER_FILE 30
+#define FREQMAN_MAX_PER_FILE_STR "30"
+
 using namespace ui;
+using namespace std;
 
 enum freqman_error {
 	NO_ERROR = 0,
 	ERROR_ACCESS,
-	ERROR_EMPTY,
+	ERROR_NOFILES,
 	ERROR_DUPLICATE
 };
 
+enum freqman_entry_type {
+	SINGLE = 0,
+	RANGE
+};
+
 struct freqman_entry {
-	rf::Frequency value;
-	std::string frequency_str;
-	std::string description;
-	int32_t category_id;
+	rf::Frequency frequency_a { 0 };
+	rf::Frequency frequency_b { 0 };
+	std::string description { };
+	freqman_entry_type type { };
 };
 
-struct freqman_db {
-	std::vector<freqman_entry> entries;
-	std::vector<std::string> categories;
-};
+using freqman_db = std::vector<freqman_entry>;
 
-bool load_freqman_file(freqman_db &db);
-bool save_freqman_file(freqman_db &db);
-bool create_freqman_file(File &freqs_file);
-std::string freqman_item_string(freqman_entry &item);
+std::vector<std::string> get_freqman_files();
+bool load_freqman_file(std::string& file_stem, freqman_db& db);
+bool save_freqman_file(std::string& file_stem, freqman_db& db);
+bool create_freqman_file(std::string& file_stem, File& freqman_file);
+std::string freqman_item_string(freqman_entry &item, size_t max_length);
 
 #endif/*__FREQMAN_H__*/
