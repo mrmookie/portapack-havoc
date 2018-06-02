@@ -36,6 +36,50 @@ using namespace portapack;
 namespace ui {
 namespace spectrum {
 
+/* AudioSpectrumView******************************************************/
+
+AudioSpectrumView::AudioSpectrumView(
+	const Rect parent_rect
+) : View { parent_rect }
+{
+	set_focusable(true);
+	
+	add_children({
+		&labels,
+		&field_frequency,
+		&waveform
+	});
+	
+	field_frequency.on_change = [this](int32_t) {
+		set_dirty();
+	};
+	field_frequency.set_value(0);
+}
+
+void AudioSpectrumView::paint(Painter& painter) {
+	const auto r = screen_rect();
+
+	painter.fill_rectangle(r, Color::black());
+
+	//if( !spectrum_sampling_rate ) return;
+	
+	// Cursor
+	const Rect r_cursor {
+		field_frequency.value() / (48000 / 240), r.bottom() - 32 - cursor_band_height,
+		1, cursor_band_height
+	};
+	painter.fill_rectangle(
+		r_cursor,
+		Color::red()
+	);
+}
+
+void AudioSpectrumView::on_audio_spectrum(const AudioSpectrum& spectrum) {
+	for (size_t i = 0; i < spectrum.db.size(); i++)
+		audio_spectrum[i] = ((int16_t)spectrum.db[i] - 127) * 256;
+	waveform.set_dirty();
+}
+
 /* FrequencyScale ********************************************************/
 
 void FrequencyScale::on_show() {
@@ -73,6 +117,17 @@ void FrequencyScale::paint(Painter& painter) {
 
 	draw_filter_ranges(painter, r);
 	draw_frequency_ticks(painter, r);
+	
+	if (_blink) {
+		const Rect r_cursor {
+			120 + cursor_position, r.bottom() - filter_band_height,
+			2, filter_band_height
+		};
+		painter.fill_rectangle(
+			r_cursor,
+			Color::red()
+		);
+	}
 }
 
 void FrequencyScale::clear() {
@@ -172,6 +227,48 @@ void FrequencyScale::draw_filter_ranges(Painter& painter, const Rect r) {
 	}
 }
 
+void FrequencyScale::on_focus() {
+	_blink = true;
+	on_tick_second();
+	signal_token_tick_second = rtc_time::signal_tick_second += [this]() {
+		this->on_tick_second();
+	};
+}
+
+void FrequencyScale::on_blur() {
+	rtc_time::signal_tick_second -= signal_token_tick_second;
+	_blink = false;
+	set_dirty();
+}
+
+bool FrequencyScale::on_encoder(const EncoderEvent delta) {
+	cursor_position += delta;
+	
+	cursor_position = std::min<int32_t>(cursor_position, 119);
+	cursor_position = std::max<int32_t>(cursor_position, -120);
+	
+	set_dirty();
+	
+	return true;
+}
+
+bool FrequencyScale::on_key(const KeyEvent key) {
+	if( key == KeyEvent::Select ) {
+		if( on_select ) {
+			on_select((cursor_position * spectrum_sampling_rate) / 240);
+			cursor_position = 0;
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+void FrequencyScale::on_tick_second() {
+	set_dirty();
+	_blink = !_blink;
+}
+
 /* WaterfallView *********************************************************/
 
 void WaterfallView::on_show() {
@@ -226,11 +323,18 @@ void WaterfallView::clear() {
 
 /* WaterfallWidget *******************************************************/
 
-WaterfallWidget::WaterfallWidget() {
+WaterfallWidget::WaterfallWidget(const bool cursor) {
 	add_children({
 		&waterfall_view,
-		&frequency_scale,
+		&frequency_scale
 	});
+	
+	frequency_scale.set_focusable(cursor);
+	
+	// Making the event climb up all the way up to here kinda sucks
+	frequency_scale.on_select = [this](int32_t offset) {
+		if (on_select) on_select(offset);
+	};
 }
 
 void WaterfallWidget::on_show() {
@@ -241,16 +345,39 @@ void WaterfallWidget::on_hide() {
 	baseband::spectrum_streaming_stop();
 }
 
-void WaterfallWidget::set_parent_rect(const Rect new_parent_rect) {
-	constexpr Dim scale_height = 20;
+void WaterfallWidget::show_audio_spectrum_view(const bool show) {
+	if ((audio_spectrum_view && show) || (!audio_spectrum_view && !show)) return;
+	
+	if (show) {
+		audio_spectrum_view = std::make_unique<AudioSpectrumView>(audio_spectrum_view_rect);
+		add_child(audio_spectrum_view.get());
+		update_widgets_rect();
+	} else {
+		audio_fifo = nullptr;
+		remove_child(audio_spectrum_view.get());
+		audio_spectrum_view.reset();
+		update_widgets_rect();
+	}
+}
 
+void WaterfallWidget::update_widgets_rect() {
+	if (audio_spectrum_view) {
+		frequency_scale.set_parent_rect({ 0, audio_spectrum_height, screen_rect().width(), scale_height });
+		waterfall_view.set_parent_rect(waterfall_reduced_rect);
+	} else {
+		frequency_scale.set_parent_rect({ 0, 0, screen_rect().width(), scale_height });
+		waterfall_view.set_parent_rect(waterfall_normal_rect);
+	}
+	waterfall_view.on_show();
+}
+
+void WaterfallWidget::set_parent_rect(const Rect new_parent_rect) {
 	View::set_parent_rect(new_parent_rect);
-	frequency_scale.set_parent_rect({ 0, 0, new_parent_rect.width(), scale_height });
-	waterfall_view.set_parent_rect({
-		0, scale_height,
-		new_parent_rect.width(),
-		new_parent_rect.height() - scale_height
-	});
+	
+	waterfall_normal_rect = { 0, scale_height, new_parent_rect.width(), new_parent_rect.height() - scale_height};
+	waterfall_reduced_rect = { 0, audio_spectrum_height + scale_height, new_parent_rect.width(), new_parent_rect.height() - scale_height - audio_spectrum_height };
+	
+	update_widgets_rect();
 }
 
 void WaterfallWidget::paint(Painter& painter) {
@@ -260,11 +387,16 @@ void WaterfallWidget::paint(Painter& painter) {
 
 void WaterfallWidget::on_channel_spectrum(const ChannelSpectrum& spectrum) {
 	waterfall_view.on_channel_spectrum(spectrum);
-	frequency_scale.set_spectrum_sampling_rate(spectrum.sampling_rate);
+	sampling_rate = spectrum.sampling_rate;
+	frequency_scale.set_spectrum_sampling_rate(sampling_rate);
 	frequency_scale.set_channel_filter(
 		spectrum.channel_filter_pass_frequency,
 		spectrum.channel_filter_stop_frequency
 	);
+}
+
+void WaterfallWidget::on_audio_spectrum(const AudioSpectrum& spectrum) {
+	audio_spectrum_view->on_audio_spectrum(spectrum);
 }
 
 } /* namespace spectrum */

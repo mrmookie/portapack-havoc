@@ -75,6 +75,7 @@ public:
 		ReplayThreadDone = 21,
 		AFSKRxConfigure = 22,
 		StatusRefresh = 23,
+		SamplerateConfig = 24,
 
 		TXProgress = 30,
 		Retune = 31,
@@ -95,16 +96,17 @@ public:
 		SigGenConfig = 43,
 		SigGenTone = 44,
 		
-		POCSAGPacket = 50,
-		ADSBFrame = 51,
-		AFSKData = 52,
-		TestAppPacket = 53,
+		POCSAGPacket = 45,
+		ADSBFrame = 46,
+		AFSKData = 47,
+		TestAppPacket = 48,
 		
-		RequestSignal = 60,
-		FIFOData = 61,
+		RequestSignal = 49,
+		FIFOData = 50,
 		
-		AudioLevelReport = 70,
-		CodedSquelch = 71,
+		AudioLevelReport = 51,
+		CodedSquelch = 52,
+		AudioSpectrumConfig = 53,
 		MAX
 	};
 
@@ -270,6 +272,27 @@ public:
 
 	size_t sampling_rate { 0 };
 	size_t trigger { 0 };
+};
+
+struct AudioSpectrum {
+	std::array<uint8_t, 128> db { { 0 } };
+	//uint32_t sampling_rate { 0 };
+};
+
+using AudioSpectrumFIFO = FIFO<AudioSpectrum>;
+
+class AudioSpectrumConfigMessage : public Message {
+public:
+	static constexpr size_t fifo_k = 2;
+	
+	constexpr AudioSpectrumConfigMessage(
+		AudioSpectrumFIFO* fifo
+	) : Message { ID::AudioSpectrumConfig },
+		fifo { fifo }
+	{
+	}
+
+	AudioSpectrumFIFO* fifo { nullptr };
 };
 
 struct ChannelSpectrum {
@@ -751,6 +774,18 @@ public:
 	uint32_t range = 0;
 };
 
+class SamplerateConfigMessage : public Message {
+public:
+	constexpr SamplerateConfigMessage(
+		const uint32_t sample_rate
+	) : Message { ID::SamplerateConfig },
+		sample_rate(sample_rate)
+	{
+	}
+	
+	const uint32_t sample_rate = 0;
+};
+
 class AudioLevelReportMessage : public Message {
 public:
 	constexpr AudioLevelReportMessage(
@@ -765,22 +800,22 @@ class AudioTXConfigMessage : public Message {
 public:
 	constexpr AudioTXConfigMessage(
 		const uint32_t divider,
-		const uint32_t fm_delta,
-		const uint32_t gain_x10,
+		const float deviation_hz,
+		const float audio_gain,
 		const uint32_t tone_key_delta,
 		const float tone_key_mix_weight
 	) : Message { ID::AudioTXConfig },
 		divider(divider),
-		fm_delta(fm_delta),
-		gain_x10(gain_x10),
+		deviation_hz(deviation_hz),
+		audio_gain(audio_gain),
 		tone_key_delta(tone_key_delta),
 		tone_key_mix_weight(tone_key_mix_weight)
 	{
 	}
 
 	const uint32_t divider;
-	const uint32_t fm_delta;
-	const uint32_t gain_x10;
+	const float deviation_hz;
+	const float audio_gain;
 	const uint32_t tone_key_delta;
 	const float tone_key_mix_weight;
 };

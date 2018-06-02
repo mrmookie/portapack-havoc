@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 Jared Boone, ShareBrained Technology, Inc.
+ * Copyright (C) 2018 Furrtek
  *
  * This file is part of PortaPack.
  *
@@ -47,9 +48,9 @@ public:
 	std::string title() const override { return "Capture"; };
 
 private:
-	static constexpr ui::Dim header_height = 2 * 16;
+	static constexpr ui::Dim header_height = 3 * 16;
 
-	static constexpr uint32_t sampling_rate = 4000000;
+	uint32_t sampling_rate = 0;
 	static constexpr uint32_t baseband_bandwidth = 2500000;
 
 	void on_target_frequency_changed(rf::Frequency f);
@@ -59,6 +60,10 @@ private:
 
 	rf::Frequency tuning_frequency() const;
 
+	Labels labels {
+		{ { 0 * 8, 1 * 16 }, "Rate:", Color::light_grey() },
+	};
+	
 	RSSI rssi {
 		{ 24 * 8, 0, 6 * 8, 4 },
 	};
@@ -87,8 +92,23 @@ private:
 		{ 21 * 8, 0 * 16 }
 	};
 
+	OptionsField option_bandwidth {
+		{ 5 * 8, 1 * 16 },
+		5,
+		{
+			{ "  8k5", 8500 },
+			{ " 11k ", 11000 },
+			{ " 16k ", 16000 },
+			{ " 25k ", 25000 },
+			{ " 50k ", 50000 },
+			{ "100k ", 100000 },
+			{ "250k ", 250000 },
+			{ "500k ", 500000 }
+		}
+	};
+	
 	RecordView record_view {
-		{ 0 * 8, 1 * 16, 30 * 8, 1 * 16 },
+		{ 0 * 8, 2 * 16, 30 * 8, 1 * 16 },
 		u"BBD_????", RecordView::FileType::RawS16, 16384, 3
 	};
 

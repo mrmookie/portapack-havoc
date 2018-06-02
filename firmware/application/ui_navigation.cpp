@@ -37,7 +37,7 @@
 #include "ui_aprs_tx.hpp"
 #include "ui_bht_tx.hpp"
 #include "ui_coasterp.hpp"
-#include "ui_debug.hpp"
+//#include "ui_debug.hpp"
 #include "ui_encoders.hpp"
 #include "ui_fileman.hpp"
 #include "ui_freqman.hpp"
@@ -47,18 +47,21 @@
 #include "ui_mictx.hpp"
 #include "ui_morse.hpp"
 //#include "ui_numbers.hpp"
-#include "ui_nuoptix.hpp"
+//#include "ui_nuoptix.hpp"
 #include "ui_playdead.hpp"
 #include "ui_pocsag_tx.hpp"
 #include "ui_rds.hpp"
+#include "ui_remote.hpp"
 #include "ui_scanner.hpp"
+#include "ui_search.hpp"
 #include "ui_sd_wipe.hpp"
-#include "ui_setup.hpp"
+#include "ui_settings.hpp"
 #include "ui_siggen.hpp"
 #include "ui_sonde.hpp"
 #include "ui_soundboard.hpp"
 #include "ui_sstvtx.hpp"
-#include "ui_test.hpp"
+//#include "ui_test.hpp"
+#include "ui_tone_search.hpp"
 #include "ui_touchtunes.hpp"
 #include "ui_view_wav.hpp"
 #include "ui_whipcalc.hpp"
@@ -77,6 +80,7 @@
 #include "png_writer.hpp"
 
 using portapack::receiver_model;
+using portapack::transmitter_model;
 
 namespace ui {
 
@@ -145,7 +149,7 @@ SystemStatusView::SystemStatusView(
 }
 
 void SystemStatusView::refresh() {
-	if (receiver_model.antenna_bias()) {
+	if (portapack::get_antenna_bias()) {
 		button_bias_tee.set_bitmap(&bitmap_icon_biast_on);
 		button_bias_tee.set_foreground(ui::Color::yellow());
 	} else {
@@ -171,28 +175,26 @@ void SystemStatusView::on_stealth() {
 	bool mode = not portapack::persistent_memory::stealth_mode();
 	
 	portapack::persistent_memory::set_stealth_mode(mode);
-	
-	if (mode)
-		button_stealth.set_foreground(ui::Color::green());
-	else
-		button_stealth.set_foreground(ui::Color::light_grey());
+
+	button_stealth.set_foreground(mode ? ui::Color::green() : ui::Color::light_grey());
 	
 	button_stealth.set_dirty();
 }
 
 void SystemStatusView::on_bias_tee() {
-	bool antenna_bias = receiver_model.antenna_bias();
-	
-	if (!antenna_bias) {
+	if (!portapack::antenna_bias) {
 		nav_.display_modal("Bias voltage", "Enable DC voltage on\nantenna connector ?", YESNO, [this](bool v) {
 				if (v) {
-					receiver_model.set_antenna_bias(true);
+					portapack::set_antenna_bias(true);
+					receiver_model.set_antenna_bias();
+					transmitter_model.set_antenna_bias();
 					refresh();
 				}
 			});
-	
 	} else {
-		receiver_model.set_antenna_bias(false);
+		portapack::set_antenna_bias(false);
+		receiver_model.set_antenna_bias();
+		transmitter_model.set_antenna_bias();
 		refresh();
 	}
 }
@@ -327,18 +329,20 @@ void NavigationView::focus() {
 
 ReceiversMenuView::ReceiversMenuView(NavigationView& nav) {
 	add_items({
-		{ "ADS-B: Planes", 			ui::Color::green(),	&bitmap_icon_adsb,	[&nav](){ nav.push<ADSBRxView>(); }, },
-		{ "AIS:   Boats", 			ui::Color::green(),	&bitmap_icon_ais,	[&nav](){ nav.push<AISAppView>(); } },
-		{ "AFSK", 					ui::Color::yellow(),&bitmap_icon_receivers,	[&nav](){ nav.push<AFSKRxView>(); } },
-		{ "APRS", 					ui::Color::grey(),	&bitmap_icon_aprs,	[&nav](){ nav.push<NotImplementedView>(); } },
-		{ "Audio", 					ui::Color::green(),	&bitmap_icon_speaker,	[&nav](){ nav.push<AnalogAudioView>(false); } },
-		{ "ERT:   Utility Meters", 	ui::Color::green(), &bitmap_icon_ert,	[&nav](){ nav.push<ERTAppView>(); } },
-		{ "POCSAG", 				ui::Color::green(),	&bitmap_icon_pocsag,	[&nav](){ nav.push<POCSAGAppView>(); } },
-		{ "SIGFOX", 				ui::Color::grey(),	&bitmap_icon_fox,	[&nav](){ nav.push<NotImplementedView>(); } }, // SIGFRXView
-		{ "LoRa", 					ui::Color::grey(),	nullptr,			[&nav](){ nav.push<NotImplementedView>(); } },
-		{ "Radiosondes", 			ui::Color::yellow(),&bitmap_icon_sonde,	[&nav](){ nav.push<SondeView>(); } },
-		{ "SSTV", 					ui::Color::grey(), 	&bitmap_icon_sstv,	[&nav](){ nav.push<NotImplementedView>(); } },
-		{ "TPMS:  Cars", 			ui::Color::green(),	&bitmap_icon_tpms,	[&nav](){ nav.push<TPMSAppView>(); } },
+		{ "ADS-B: Planes", 			ui::Color::green(),	&bitmap_icon_adsb,	[&nav](){ nav.replace<ADSBRxView>(); }, },
+		{ "AIS:   Boats", 			ui::Color::green(),	&bitmap_icon_ais,	[&nav](){ nav.replace<AISAppView>(); } },
+		{ "AFSK", 					ui::Color::yellow(),&bitmap_icon_receivers,	[&nav](){ nav.replace<AFSKRxView>(); } },
+		{ "APRS", 					ui::Color::grey(),	&bitmap_icon_aprs,	[&nav](){ nav.replace<NotImplementedView>(); } },
+		{ "Audio", 					ui::Color::green(),	&bitmap_icon_speaker,	[&nav](){ nav.replace<AnalogAudioView>(false); } },
+		{ "DMR framing", 			ui::Color::grey(),	&bitmap_icon_dmr,	[&nav](){ nav.replace<NotImplementedView>(); } },
+		{ "ERT:   Utility Meters", 	ui::Color::green(), &bitmap_icon_ert,	[&nav](){ nav.replace<ERTAppView>(); } },
+		{ "POCSAG", 				ui::Color::green(),	&bitmap_icon_pocsag,	[&nav](){ nav.replace<POCSAGAppView>(); } },
+		{ "SIGFOX", 				ui::Color::grey(),	&bitmap_icon_fox,	[&nav](){ nav.replace<NotImplementedView>(); } }, // SIGFRXView
+		{ "LoRa", 					ui::Color::grey(),	&bitmap_icon_lora,	[&nav](){ nav.replace<NotImplementedView>(); } },
+		{ "Radiosondes", 			ui::Color::yellow(),&bitmap_icon_sonde,	[&nav](){ nav.replace<SondeView>(); } },
+		{ "SSTV", 					ui::Color::grey(), 	&bitmap_icon_sstv,	[&nav](){ nav.replace<NotImplementedView>(); } },
+		{ "TETRA framing", 			ui::Color::grey(),	&bitmap_icon_tetra,	[&nav](){ nav.replace<NotImplementedView>(); } },
+		{ "TPMS:  Cars", 			ui::Color::green(),	&bitmap_icon_tpms,	[&nav](){ nav.replace<TPMSAppView>(); } },
 	});
 	on_left = [&nav](){ nav.pop(); };
 	
@@ -350,22 +354,22 @@ ReceiversMenuView::ReceiversMenuView(NavigationView& nav) {
 TransmittersMenuView::TransmittersMenuView(NavigationView& nav) {
 	add_items({
 		{ "ADS-B Mode S", 			ui::Color::yellow(), 	&bitmap_icon_adsb,		[&nav](){ nav.push<ADSBTxView>(); } },
-		{ "APRS", 					ui::Color::grey(),		&bitmap_icon_aprs,		[&nav](){ nav.push<APRSTXView>(); } },
+		{ "APRS", 					ui::Color::orange(),	&bitmap_icon_aprs,		[&nav](){ nav.push<APRSTXView>(); } },
 		{ "BHT Xy/EP", 				ui::Color::green(), 	&bitmap_icon_bht,		[&nav](){ nav.push<BHTView>(); } },
+		{ "Custom remote", 			ui::Color::grey(),		&bitmap_icon_remote,	[&nav](){ nav.push<RemoteView>(); } },
 		{ "Jammer", 				ui::Color::yellow(),	&bitmap_icon_jammer,	[&nav](){ nav.push<JammerView>(); } },
 		{ "Key fob", 				ui::Color::orange(),	&bitmap_icon_keyfob,	[&nav](){ nav.push<KeyfobView>(); } },
 		{ "Microphone", 			ui::Color::green(),		&bitmap_icon_microphone,	[&nav](){ nav.push<MicTXView>(); } },
 		{ "Morse code", 			ui::Color::green(),		&bitmap_icon_morse,		[&nav](){ nav.push<MorseView>(); } },
 		{ "NTTWorks burger pager", 	ui::Color::yellow(), 	&bitmap_icon_burger,	[&nav](){ nav.push<CoasterPagerView>(); } },
-		{ "Nuoptix DTMF timecode", 	ui::Color::green(),		&bitmap_icon_nuoptix,	[&nav](){ nav.push<NuoptixView>(); } },
-		{ "Generic OOK remotes", 	ui::Color::yellow(),	&bitmap_icon_remote,	[&nav](){ nav.push<EncodersView>(); } },
+		//{ "Nuoptix DTMF timecode", 	ui::Color::green(),		&bitmap_icon_nuoptix,	[&nav](){ nav.push<NuoptixView>(); } },
+		{ "OOK encoders", 			ui::Color::yellow(),	&bitmap_icon_remote,	[&nav](){ nav.push<EncodersView>(); } },
 		{ "POCSAG", 				ui::Color::green(),		&bitmap_icon_pocsag,	[&nav](){ nav.push<POCSAGTXView>(); } },
 		{ "RDS",					ui::Color::green(),		&bitmap_icon_rds,		[&nav](){ nav.push<RDSView>(); } },
-		{ "Signal generator", 		ui::Color::green(), 	&bitmap_icon_cwgen,		[&nav](){ nav.push<SigGenView>(); } },
 		{ "Soundboard", 			ui::Color::green(), 	&bitmap_icon_soundboard,	[&nav](){ nav.push<SoundBoardView>(); } },
 		{ "SSTV", 					ui::Color::green(), 	&bitmap_icon_sstv,		[&nav](){ nav.push<SSTVTXView>(); } },
 		{ "TEDI/LCR AFSK", 			ui::Color::yellow(), 	&bitmap_icon_lcr,		[&nav](){ nav.push<LCRView>(); } },
-		{ "TouchTunes remote",		ui::Color::orange(),	nullptr,				[&nav](){ nav.push<TouchTunesView>(); } },
+		{ "TouchTunes remote",		ui::Color::yellow(),	nullptr,				[&nav](){ nav.push<TouchTunesView>(); } },
 	});
 	on_left = [&nav](){ nav.pop(); };
 }
@@ -374,11 +378,14 @@ TransmittersMenuView::TransmittersMenuView(NavigationView& nav) {
 
 UtilitiesMenuView::UtilitiesMenuView(NavigationView& nav) {
 	add_items({
-		{ "Test app", 				ui::Color::grey(), 		nullptr,				[&nav](){ nav.push<TestView>(); } },
+		//{ "Test app", 				ui::Color::grey(), 		nullptr,				[&nav](){ nav.push<TestView>(); } },
 		{ "Frequency manager", 		ui::Color::green(), 	&bitmap_icon_freqman,	[&nav](){ nav.push<FrequencyManagerView>(); } },
 		{ "File manager", 			ui::Color::yellow(),	&bitmap_icon_file,		[&nav](){ nav.push<FileManagerView>(); } },
-		{ "Whip antenna length",	ui::Color::yellow(),	nullptr,				[&nav](){ nav.push<WhipCalcView>(); } },
 		{ "Notepad",				ui::Color::grey(),		&bitmap_icon_notepad,	[&nav](){ nav.push<NotImplementedView>(); } },
+		{ "Signal generator", 		ui::Color::green(), 	&bitmap_icon_cwgen,		[&nav](){ nav.push<SigGenView>(); } },
+		//{ "Tone search", 			ui::Color::grey(), 		nullptr,				[&nav](){ nav.push<ToneSearchView>(); } },
+		{ "Wave file viewer", 		ui::Color::blue(),		nullptr,				[&nav](){ nav.push<ViewWavView>(); } },
+		{ "Whip antenna length",	ui::Color::yellow(),	nullptr,				[&nav](){ nav.push<WhipCalcView>(); } },
 		{ "Wipe SD card",			ui::Color::red(),		nullptr,				[&nav](){ nav.push<WipeSDView>(); } },
 	});
 	on_left = [&nav](){ nav.pop(); };
@@ -402,11 +409,11 @@ SystemMenuView::SystemMenuView(NavigationView& nav) {
 		{ "Receivers", 				ui::Color::cyan(),		&bitmap_icon_receivers,	[&nav](){ nav.push<ReceiversMenuView>(); } },
 		{ "Transmitters", 			ui::Color::green(),		&bitmap_icon_transmit,	[&nav](){ nav.push<TransmittersMenuView>(); } },
 		{ "Capture",				ui::Color::blue(),		&bitmap_icon_capture,	[&nav](){ nav.push<CaptureAppView>(); } },
-		{ "Replay",					ui::Color::purple(),		&bitmap_icon_replay,	[&nav](){ nav.push<ReplayAppView>(); } },
-		{ "Scanner/search",			ui::Color::orange(),	&bitmap_icon_closecall,	[&nav](){ nav.push<ScannerView>(); } },
-		{ "Wave file viewer", 		ui::Color::blue(),		nullptr,				[&nav](){ nav.push<ViewWavView>(); } },
+		{ "Replay",					ui::Color::purple(),	&bitmap_icon_replay,	[&nav](){ nav.push<ReplayAppView>(); } },
+		{ "Search/Close call",		ui::Color::yellow(),	&bitmap_icon_closecall,	[&nav](){ nav.push<SearchView>(); } },
+		{ "Scanner",				ui::Color::grey(),		&bitmap_icon_scanner,	[&nav](){ nav.push<ScannerView>(); } },
 		{ "Utilities",				ui::Color::light_grey(),	&bitmap_icon_utilities,	[&nav](){ nav.push<UtilitiesMenuView>(); } },
-		{ "Setup", 					ui::Color::white(),		&bitmap_icon_setup,		[&nav](){ nav.push<SetupMenuView>(); } },
+		{ "Settings", 				ui::Color::white(),		&bitmap_icon_setup,		[&nav](){ nav.push<SettingsMenuView>(); } },
 		//{ "Debug", 					ui::Color::white(), nullptr,   				[&nav](){ nav.push<DebugMenuView>(); } },
 		{ "HackRF mode", 			ui::Color::white(),		&bitmap_icon_hackrf,	[this, &nav](){ hackrf_mode(nav); } },
 		{ "About", 					ui::Color::white(),		nullptr,				[&nav](){ nav.push<AboutView>(); } }
@@ -459,10 +466,12 @@ SystemView::SystemView(
 		(portapack::persistent_memory::ui_config() & 16)) {					// Login option
 		navigation_view.push<PlayDeadView>();
 	} else {*/
+	
 		if (portapack::persistent_memory::config_splash())
 			navigation_view.push<BMPView>();
 		else
 			navigation_view.push<SystemMenuView>();
+			
 	//}
 }
 

@@ -1309,17 +1309,19 @@ SymField::SymField(
 	} else if (type == SYMFIELD_HEX) {
 		for (c = 0; c < length; c++)
 			set_symbol_list(c, "0123456789ABCDEF");
+	} else if (type == SYMFIELD_ALPHANUM) {
+		for (c = 0; c < length; c++)
+			set_symbol_list(c, " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
 	}
 	
 	set_focusable(true);
 }
 
 uint32_t SymField::value_dec_u32() {
-	uint32_t c, mul = 1;
-	uint32_t v = 0;
+	uint32_t mul = 1, v = 0;
 	
 	if (type_ == SYMFIELD_DEC) {
-		for (c = 0; c < length_; c++) {
+		for (uint32_t c = 0; c < length_; c++) {
 			v += values_[(length_ - 1 - c)] * mul;
 			mul *= 10;
 		}
@@ -1329,15 +1331,26 @@ uint32_t SymField::value_dec_u32() {
 }
 
 uint64_t SymField::value_hex_u64() {
-	uint32_t c;
 	uint64_t v = 0;
 	
 	if (type_ != SYMFIELD_DEF) {
-		for (c = 0; c < length_; c++)
+		for (uint32_t c = 0; c < length_; c++)
 			v += (uint64_t)(values_[c]) << (4 * (length_ - 1 - c));
 		return v;
 	} else 
 		return 0;
+}
+
+std::string SymField::value_string() {
+	std::string return_string { "" };
+	
+	if (type_ == SYMFIELD_ALPHANUM) {
+		for (uint32_t c = 0; c < length_; c++) {
+			return_string += symbol_list_[0][values_[c]];
+		}
+	}
+	
+	return return_string;
 }
 	
 uint32_t SymField::get_sym(const uint32_t index) {
@@ -1480,6 +1493,7 @@ Waveform::Waveform(
 	color_ { color }
 {
 	//set_focusable(false);
+	//previous_data.resize(length_, 0);
 }
 
 void Waveform::set_cursor(const uint32_t i, const int16_t position) {
@@ -1515,12 +1529,12 @@ void Waveform::paint(Painter& painter) {
 	const float y_scale = (float)(h - 1) / 65536.0;
 	int16_t * data_start = data_ + offset_;
 	
-	// Clear
-	painter.fill_rectangle(screen_rect(), Color::black());
-	
 	if (!length_) return;
 	
 	x_inc = (float)screen_rect().size().width() / length_;
+	
+	// Clear
+	painter.fill_rectangle_unrolled8(screen_rect(), Color::black());
 	
 	if (digital_) {
 		// Digital waveform: each value is an horizontal line

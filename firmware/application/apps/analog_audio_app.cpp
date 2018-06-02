@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 Jared Boone, ShareBrained Technology, Inc.
+ * Copyright (C) 2018 Furrtek
  *
  * This file is part of PortaPack.
  *
@@ -100,10 +101,8 @@ AnalogAudioView::AnalogAudioView(
 		&field_volume,
 		&text_ctcss,
 		&record_view,
-		&waterfall,
+		&waterfall
 	});
-	
-	exit_on_squelch = eos;
 
 	field_frequency.set_value(receiver_model.tuning_frequency());
 	field_frequency.set_step(receiver_model.frequency_step());
@@ -148,6 +147,10 @@ AnalogAudioView::AnalogAudioView(
 	record_view.on_error = [&nav](std::string message) {
 		nav.display_modal("Error", message);
 	};
+	
+	waterfall.on_select = [this](int32_t offset) {
+		field_frequency.set_value(receiver_model.tuning_frequency() + offset);
+	};
 
 	audio::output::start();
 
@@ -173,7 +176,7 @@ void AnalogAudioView::on_hide() {
 
 void AnalogAudioView::set_parent_rect(const Rect new_parent_rect) {
 	View::set_parent_rect(new_parent_rect);
-
+	
 	const ui::Rect waterfall_rect { 0, header_height, new_parent_rect.width(), new_parent_rect.height() - header_height };
 	waterfall.set_parent_rect(waterfall_rect);
 }
@@ -204,9 +207,7 @@ void AnalogAudioView::remove_options_widget() {
 		remove_child(options_widget.get());
 		options_widget.reset();
 	}
-
-	text_ctcss.hidden(true);
-
+	
 	field_lna.set_style(nullptr);
 	options_modulation.set_style(nullptr);
 	field_frequency.set_style(nullptr);
@@ -254,20 +255,32 @@ void AnalogAudioView::on_show_options_modulation() {
 	switch(modulation) {
 	case ReceiverModel::Mode::AMAudio:
 		widget = std::make_unique<AMOptionsView>(options_view_rect, &style_options_group);
+		waterfall.show_audio_spectrum_view(false);
+		text_ctcss.hidden(true);
 		break;
 
 	case ReceiverModel::Mode::NarrowbandFMAudio:
 		widget = std::make_unique<NBFMOptionsView>(nbfm_view_rect, &style_options_group);
+		waterfall.show_audio_spectrum_view(false);
+		text_ctcss.hidden(false);
 		break;
-
+	
+	case ReceiverModel::Mode::WidebandFMAudio:
+		waterfall.show_audio_spectrum_view(true);
+		text_ctcss.hidden(true);
+		break;
+	
+	case ReceiverModel::Mode::SpectrumAnalysis:
+		waterfall.show_audio_spectrum_view(false);
+		text_ctcss.hidden(true);
+		break;
+		
 	default:
 		break;
 	}
 
 	set_options_widget(std::move(widget));
 	options_modulation.set_style(&style_options_group);
-	
-	if (modulation == ReceiverModel::Mode::NarrowbandFMAudio) text_ctcss.hidden(false);
 }
 
 void AnalogAudioView::on_frequency_step_changed(rf::Frequency f) {
@@ -328,15 +341,16 @@ void AnalogAudioView::update_modulation(const ReceiverModel::Mode modulation) {
 	}
 }
 
-void AnalogAudioView::squelched() {
+/*void AnalogAudioView::squelched() {
 	if (exit_on_squelch) nav_.pop();
-}
+}*/
 
 void AnalogAudioView::handle_coded_squelch(const uint32_t value) {
 	float diff, min_diff = value;
 	size_t min_idx { 0 };
 	size_t c;
 	
+	// Find nearest match
 	for (c = 0; c < tone_keys.size(); c++) {
 		diff = abs(((float)value / 100.0) - tone_keys[c].second);
 		if (diff < min_diff) {
@@ -345,6 +359,7 @@ void AnalogAudioView::handle_coded_squelch(const uint32_t value) {
 		}
 	}
 	
+	// Arbitrary confidence threshold
 	if (min_diff < 40)
 		text_ctcss.set("CTCSS " + tone_keys[min_idx].first);
 	else

@@ -27,8 +27,11 @@
 #include "dsp_iir_config.hpp"
 
 #include "portapack_shared_memory.hpp"
+#include "portapack_persistent_memory.hpp"
 
 #include "core_control.hpp"
+
+using namespace portapack;
 
 namespace baseband {
 
@@ -152,14 +155,14 @@ void kill_afsk() {
 	send_message(&message);
 }
 
-void set_audiotx_data(const uint32_t divider, const uint32_t bw, const uint32_t gain_x10,
-					const uint32_t tone_key_delta, const float tone_key_mix_weight) {
+void set_audiotx_config(const uint32_t divider, const float deviation_hz, const float audio_gain,
+					const uint32_t tone_key_delta) {
 	const AudioTXConfigMessage message {
 		divider,
-		bw,
-		gain_x10,
+		deviation_hz,
+		audio_gain,
 		tone_key_delta,
-		tone_key_mix_weight
+		(float)persistent_memory::tone_mix() / 100.0f
 	};
 	send_message(&message);
 }
@@ -240,7 +243,7 @@ void set_spectrum(const size_t sampling_rate, const size_t trigger) {
 
 void set_siggen_tone(const uint32_t tone) {
 	const SigGenToneMessage message {
-		TONES_F2D(tone)
+		TONES_F2D(tone, TONES_SAMPLERATE)
 	};
 	send_message(&message);
 }
@@ -293,6 +296,11 @@ void spectrum_streaming_stop() {
 	SpectrumStreamingConfigMessage message {
 		SpectrumStreamingConfigMessage::Mode::Stopped
 	};
+	send_message(&message);
+}
+
+void set_sample_rate(const uint32_t sample_rate) {
+	SamplerateConfigMessage message { sample_rate };
 	send_message(&message);
 }
 

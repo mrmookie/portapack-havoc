@@ -143,7 +143,7 @@ set(CPPSRC
 	${COMMON}/portapack_persistent_memory.cpp
 	${COMMON}/portapack_shared_memory.cpp
 	${COMMON}/sonde_packet.cpp
-	${COMMON}/test_packet.cpp
+	# ${COMMON}/test_packet.cpp
 	${COMMON}/tpms_packet.cpp
 	${COMMON}/ui.cpp
 	${COMMON}/ui_focus.cpp
@@ -217,7 +217,7 @@ set(CPPSRC
 	apps/ui_aprs_tx.cpp
 	apps/ui_bht_tx.cpp
 	apps/ui_coasterp.cpp
-	apps/ui_debug.cpp
+	# apps/ui_debug.cpp
 	apps/ui_encoders.cpp
 	apps/ui_fileman.cpp
 	apps/ui_freqman.cpp
@@ -227,17 +227,20 @@ set(CPPSRC
 	apps/ui_mictx.cpp
 	apps/ui_modemsetup.cpp
 	apps/ui_morse.cpp
-	apps/ui_nuoptix.cpp
+	# apps/ui_nuoptix.cpp
 	apps/ui_pocsag_tx.cpp
 	apps/ui_rds.cpp
+	apps/ui_remote.cpp
 	apps/ui_scanner.cpp
+	apps/ui_search.cpp
 	apps/ui_sd_wipe.cpp
-	apps/ui_setup.cpp
+	apps/ui_settings.cpp
 	apps/ui_siggen.cpp
 	apps/ui_sonde.cpp
 	apps/ui_soundboard.cpp
 	apps/ui_sstvtx.cpp
-	apps/ui_test.cpp
+	# apps/ui_test.cpp
+	apps/ui_tone_search.cpp
 	apps/ui_touch_calibration.cpp
 	apps/ui_touchtunes.cpp
 	apps/ui_view_wav.cpp
