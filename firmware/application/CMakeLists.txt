@@ -109,6 +109,7 @@ set(CSRC
 # setting.
 set(CPPSRC
 	main.cpp
+	${COMMON}/acars_packet.cpp
 	${COMMON}/adsb.cpp
 	${COMMON}/adsb_frame.cpp
 	${COMMON}/ais_baseband.cpp
@@ -245,6 +246,7 @@ set(CPPSRC
 	apps/ui_touchtunes.cpp
 	apps/ui_view_wav.cpp
 	apps/ui_whipcalc.cpp
+	apps/acars_app.cpp
 	apps/analog_audio_app.cpp
 	apps/ais_app.cpp
 	apps/tpms_app.cpp
@@ -328,7 +330,7 @@ set(TOPT "-mthumb -DTHUMB")
 set(CWARN "-Wall -Wextra -Wstrict-prototypes")
 
 # Define C++ warning options here
-set(CPPWARN "-Wall -Wextra")
+set(CPPWARN "-Wall -Wextra -Wno-psabi")
 
 #
 # Compiler settings
