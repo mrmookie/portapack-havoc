@@ -185,8 +185,10 @@ public:
 
 	rf::Frequency value() const;
 	void set_value(const rf::Frequency new_value);
+	bool on_encoder(const EncoderEvent delta) override;
 
 private:
+	int16_t focused_button = 0;
 	static constexpr int button_w = 240 / 3;
 	static constexpr int button_h = 48;
 
@@ -293,7 +295,10 @@ private:
 		1,
 		'0',
 	};
-
+	Text text_ext {
+		{ 23 * 8, 0 * 16, 3 * 8, 1 * 16 },
+		"EXT",
+	};
 	Text text_ppm {
 		{ 27 * 8, 0 * 16, 3 * 8, 16 },
 		"PPM",

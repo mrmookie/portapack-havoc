@@ -36,7 +36,7 @@ set(USE_OPT "-O3 -g -falign-functions=16 -fno-math-errno --specs=nano.specs")
 set(USE_COPT "-std=gnu99")
 
 # C++ specific options here (added to USE_OPT).
-set(USE_CPPOPT "-std=c++14 -fno-rtti -fno-exceptions -Weffc++ -Wuninitialized")
+set(USE_CPPOPT "-std=c++17 -fno-rtti -fno-exceptions -Weffc++ -Wuninitialized")
 
 # Enable this if you want the linker to remove unused code and data
 set(USE_LINK_GC yes)
@@ -73,7 +73,7 @@ set(USE_FPU hard)
 #
 
 # Imported source files and paths
-include(${CHIBIOS_PORTAPACK}/boards/GSG_HACKRF_ONE/board.cmake)
+include(${CHIBIOS_PORTAPACK}/boards/PORTAPACK_BASEBAND/board.cmake)
 include(${CHIBIOS_PORTAPACK}/os/hal/platforms/LPC43xx_M4/platform.cmake)
 include(${CHIBIOS}/os/hal/hal.cmake)
 include(${CHIBIOS_PORTAPACK}/os/ports/GCC/ARMCMx/LPC43xx_M4/port.cmake)
@@ -201,7 +201,7 @@ set(CPPWARN "-Wall -Wextra")
 # List all default C defines here, like -D_DEBUG=1
 # TODO: Switch -DCRT0_INIT_DATA depending on load from RAM or SPIFI?
 # NOTE: _RANDOM_TCC to kill a GCC 4.9.3 error with std::max argument types
-set(DDEFS -DLPC43XX -DLPC43XX_M4 -D__NEWLIB__ -DHACKRF_ONE -DTOOLCHAIN_GCC -DTOOLCHAIN_GCC_ARM -D_RANDOM_TCC=0 -DGIT_REVISION=\"${GIT_REVISION}\")
+set(DDEFS "-DLPC43XX -DLPC43XX_M4 -D__NEWLIB__ -DHACKRF_ONE -DTOOLCHAIN_GCC -DTOOLCHAIN_GCC_ARM -D_RANDOM_TCC=0 -D'VERSION_STRING=\"${VERSION}\"'")
 
 # List all default ASM defines here, like -D_DEBUG=1
 set(DADEFS)
@@ -469,10 +469,9 @@ DeclareTargets(PWFM wfm_audio)
 ### HackRF "factory" firmware
 
 add_custom_command(
-	OUTPUT hackrf.bin hackrf.img
-	COMMAND ${STRIP_DFU} ${HACKRF_FIRMWARE_IMAGE} hackrf.bin
-	COMMAND ${MAKE_IMAGE_CHUNK} hackrf.bin HRF1 hackrf.img
-	DEPENDS ${HACKRF_FIRMWARE_IMAGE} ${STRIP_DFU} ${MAKE_IMAGE_CHUNK}
+	OUTPUT hackrf.img
+	COMMAND ${MAKE_IMAGE_CHUNK} ${HACKRF_FIRMWARE_BIN_IMAGE} HRF1 hackrf.img 98304
+	DEPENDS ${HACKRF_FIRMWARE_BIN_FILENAME} ${MAKE_IMAGE_CHUNK}
 	VERBATIM
 )
 

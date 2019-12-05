@@ -23,12 +23,11 @@
 #ifndef __UI_SOUNDBOARD_H__
 #define __UI_SOUNDBOARD_H__
 
-#include "ui.hpp"
 #include "ui_widget.hpp"
-#include "ui_font_fixed_8x16.hpp"
+#include "ui_transmitter.hpp"
 #include "replay_thread.hpp"
 #include "baseband_api.hpp"
-#include "ui_receiver.hpp"
+#include "lfsr_random.hpp"
 #include "io_wave.hpp"
 #include "tone_key.hpp"
 
@@ -58,121 +57,76 @@ private:
 	
 	tx_modes tx_mode = NORMAL;
 	
-	struct sound {
-		std::filesystem::path path { };
-		uint32_t ms_duration = 0;
-		std::string title { };
-	};
-	
-	uint32_t sample_counter { 0 };
-	uint32_t sample_duration { 0 };
-	uint8_t page = 0;
-	
-	uint32_t lfsr_v = 0x13377331;
-	
-	sound sounds[60];			// 5 pages * 12 buttons
-	uint32_t max_sound { };
-	uint8_t max_page { };
 	uint32_t playing_id { };
+	
+	std::vector<std::filesystem::path> file_list { };
 
 	const size_t read_size { 2048 };	// Less ?
 	const size_t buffer_count { 3 };
 	std::unique_ptr<ReplayThread> replay_thread { };
 	bool ready_signal { false };
+	lfsr_word_t lfsr_v = 1;
 	
-	Style style_a {
-		.font = font::fixed_8x16,
-		.background = Color::black(),
-		.foreground = { 255, 51, 153 }
-	};
-	Style style_b {
-		.font = font::fixed_8x16,
-		.background = Color::black(),
-		.foreground = { 153, 204, 0 }
-	};
-	Style style_c {
-		.font = font::fixed_8x16,
-		.background = Color::black(),
-		.foreground = { 51, 204, 204 }
-	};
-	Style style_d {
-		.font = font::fixed_8x16,
-		.background = Color::black(),
-		.foreground = { 153, 102, 255 }
-	};
-
-	std::array<Button, 15> buttons { };
-	const Style * styles[4] = { &style_a, &style_b, &style_c, &style_d };
-	
-	void on_tuning_frequency_changed(rf::Frequency f);
-	
-	void do_random();
-	void show_infos(uint16_t id);
-	bool change_page(Button& button, const KeyEvent key);
-	void refresh_buttons(uint16_t id);
-	void play_sound(uint16_t id);
-	void on_ctcss_changed(uint32_t v);
-	void stop(const bool do_loop);
+	//void show_infos();
+	void start_tx(const uint32_t id);
+	//void on_ctcss_changed(uint32_t v);
+	void stop();
 	bool is_active() const;
 	void set_ready();
 	void handle_replay_thread_done(const uint32_t return_code);
 	void file_error();
 	void on_tx_progress(const uint32_t progress);
+	void refresh_list();
+	void on_select_entry();
 	
 	Labels labels {
-		{ { 10 * 8, 4 }, "BW:   kHz", Color::light_grey() }
+		{ { 0, 20 * 8 + 4 }, "Title:", Color::light_grey() },
+		{ { 0, 23 * 8 }, "Key:", Color::light_grey() }
 	};
 	
-	FrequencyField field_frequency {
-		{ 0, 4 },
+	MenuView menu_view {
+		{ 0, 2 * 8, 240, 20 * 8 },
+		true
 	};
-	
-	NumberField number_bw {
-		{ 13 * 8, 4 },
-		3,
-		{ 1, 150 },
-		1,
-		' '
-	};
-	
-	OptionsField options_tone_key {
-		{ 21 * 8, 4 },
-		8,
-		{ }
+	Text text_empty {
+		{ 7 * 8, 12 * 8, 16 * 8, 16 },
+		"Empty directory !",
 	};
 	
 	Text text_title {
-		{ 1 * 8, 28 * 8, 20 * 8, 16 },
-		"-"
-	};
-	
-	Text text_page {
-		{ 22 * 8 - 4, 28 * 8, 8 * 8, 16 },
-		"Page -/-"
+		{ 6 * 8, 20 * 8 + 4, 15 * 8, 16 }
 	};
 	
 	Text text_duration {
-		{ 1 * 8, 31 * 8, 5 * 8, 16 }
+		{ 22 * 8, 20 * 8 + 4, 6 * 8, 16 }
 	};
 	
-	ProgressBar progressbar {
-		{ 9 * 8, 31 * 8, 20 * 8, 16 }
+	OptionsField options_tone_key {
+		{ 4 * 8, 23 * 8 },
+		18,
+		{ }
 	};
 	
 	Checkbox check_loop {
-		{ 8, 274 },
+		{ 8, 25 * 8 + 4 },
 		4,
 		"Loop"
 	};
 	
-	Button button_random {
-		{ 10 * 8, 34 * 8, 9 * 8, 32 },
+	Checkbox check_random {
+		{ 10 * 8, 25 * 8 + 4 },
+		6,
 		"Random"
 	};
 	
-	Button button_exit {
-		{ 21 * 8, 34 * 8, 8 * 8, 32 },
-		"Exit"
+	ProgressBar progressbar {
+		{ 0 * 8, 30 * 8 - 4, 30 * 8, 16 }
+	};
+	
+	TransmitterView tx_view {
+		16 * 16,
+		5000,
+		12
 	};
 	
 	MessageHandlerRegistration message_handler_replay_thread_error {
